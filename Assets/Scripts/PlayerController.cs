@@ -10,7 +10,7 @@ public class PlayerController : MonoBehaviour
     [Header("Dash")]
     public float dashSpeed = 18f;
     public float dashDuration = 0.18f;
-    public float dashCooldown = 0.5f; // ONE value controls everything
+    public float dashCooldown = 0.5f;
 
     [Header("Dash FX")]
     public GameObject dashFxPrefab;
@@ -47,11 +47,9 @@ public class PlayerController : MonoBehaviour
 
     bool isJumping;
     bool isDashing;
-
-    // ✅ unified dash lock
     bool dashLocked;
-    float dashLockTimer;
 
+    float dashLockTimer;
     float jumpTimer;
     float dashTimer;
 
@@ -115,6 +113,7 @@ public class PlayerController : MonoBehaviour
     }
 
     // ===================== DASH =====================
+
     void TryStartDash()
     {
         if (isDashing) return;
@@ -129,9 +128,7 @@ public class PlayerController : MonoBehaviour
         dashTimer = 0f;
 
         if (moveInput.sqrMagnitude > 0.01f)
-        {
             dashDirection = moveInput.normalized;
-        }
         else
         {
             Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(
@@ -157,7 +154,6 @@ public class PlayerController : MonoBehaviour
             rb.linearVelocity = Vector2.zero;
             visual.gameObject.SetActive(true);
 
-            // 🔒 lock dash after it ends
             dashLocked = true;
             dashLockTimer = 0f;
         }
@@ -170,12 +166,9 @@ public class PlayerController : MonoBehaviour
         dashLockTimer += Time.deltaTime;
 
         if (dashLockTimer >= dashCooldown)
-        {
             dashLocked = false;
-        }
     }
 
-    // ===================== DASH FX =====================
     void SpawnDashFX()
     {
         if (!dashFxPrefab) return;
@@ -193,12 +186,14 @@ public class PlayerController : MonoBehaviour
         Destroy(fx, dashDuration);
     }
 
-    // ===================== OTHER SYSTEMS (UNCHANGED) =====================
+    // ===================== OTHER SYSTEMS =====================
+
     void UpdateFacing()
     {
         Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(
             new Vector3(mouseScreenPos.x, mouseScreenPos.y, 10f)
         );
+
         sprite.flipX = mouseWorld.x < transform.position.x;
     }
 
@@ -210,6 +205,7 @@ public class PlayerController : MonoBehaviour
     void StartJump()
     {
         if (isJumping) return;
+        if (isDashing) return;   // block jump during dash
 
         isJumping = true;
         jumpTimer = 0f;
@@ -254,29 +250,31 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    // ===================== FIXED RUN DUST =====================
+
     void UpdateRunDust()
     {
-        bool isRunning =
-            moveInput.sqrMagnitude > 0.01f &&
+        // 🔥 Use REAL velocity instead of input
+        bool isActuallyMoving =
+            rb.linearVelocity.sqrMagnitude > 0.01f &&
             !isJumping &&
             !isDashing;
 
-        if (isRunning && !wasRunning)
+        if (isActuallyMoving && !wasRunning)
             SpawnRunDust();
 
-        if (!isRunning && wasRunning)
+        if (!isActuallyMoving && wasRunning)
             DestroyRunDust();
 
-        wasRunning = isRunning;
+        wasRunning = isActuallyMoving;
 
-        if (activeRunDust)
-        {
-            Vector2 offset = sprite.flipX ? runDustOffsetLeft : runDustOffsetRight;
-            activeRunDust.transform.localPosition = offset;
+        if (!activeRunDust) return;
 
-            SpriteRenderer sr = activeRunDust.GetComponentInChildren<SpriteRenderer>();
-            if (sr) sr.flipX = sprite.flipX;
-        }
+        Vector2 offset = sprite.flipX ? runDustOffsetLeft : runDustOffsetRight;
+        activeRunDust.transform.localPosition = offset;
+
+        SpriteRenderer sr = activeRunDust.GetComponentInChildren<SpriteRenderer>();
+        if (sr) sr.flipX = sprite.flipX;
     }
 
     void SpawnRunDust()

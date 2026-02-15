@@ -3,36 +3,60 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer))]
 public class YSort : MonoBehaviour
 {
-    public PlayerController player; // assign ONLY on player
-    public SpriteRenderer baseRenderer; // used for tree tops
+    public PlayerController player;        // assign ONLY on player
+    public SpriteRenderer baseRenderer;     // used for tree tops
+
+    // ➕ NEW: player base reference (for dash FX)
+    public Transform playerBase;            // assign GroundRef here
+
     public int offset = 0;
 
     SpriteRenderer sr;
     int lockedOrder;
+    bool wasJumping;
 
     void Awake()
     {
         sr = GetComponent<SpriteRenderer>();
-        lockedOrder = sr.sortingOrder;
     }
 
     void LateUpdate()
     {
-        // TREE TOP → follow base
+        // 1️⃣ TREE TOP → follow base
         if (baseRenderer != null)
         {
             sr.sortingOrder = baseRenderer.sortingOrder + offset;
             return;
         }
 
-        // PLAYER → freeze sorting while jumping
-        if (player != null && player.IsJumping)
+        // 2️⃣ DASH FX → follow player base Y
+        if (playerBase != null)
         {
-            sr.sortingOrder = lockedOrder;
+            float y = playerBase.position.y;
+            sr.sortingOrder = Mathf.RoundToInt(-y * 100f) + offset;
             return;
         }
 
-        // NORMAL Y-SORT
+        // 3️⃣ PLAYER → detect jump START and lock order
+        if (player != null)
+        {
+            if (player.IsJumping && !wasJumping)
+            {
+                // lock CURRENT correct order
+                lockedOrder = Mathf.RoundToInt(-transform.position.y * 100f) + offset;
+            }
+
+            if (player.IsJumping || player.IsDashing)
+            {
+                sr.sortingOrder = lockedOrder;
+                wasJumping = true;
+                return;
+            }
+
+            wasJumping = false;
+        }
+
+        // 4️⃣ NORMAL Y-SORT
         lockedOrder = Mathf.RoundToInt(-transform.position.y * 100f) + offset;
         sr.sortingOrder = lockedOrder;
     }
