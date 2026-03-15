@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections;
-using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Collider2D))]
@@ -23,10 +22,31 @@ public class PlayerController : MonoBehaviour
     public float jumpDuration = 0.22f;
     public AnimationCurve jumpCurve;
 
-    public float downJumpForce = 8f;     // Increased to clear 2 blocks
-public float downJumpDuration = 0.8f; // Longer air-time for the drop
-private float currentJumpDuration;    // Tracks which duration we are using
-public float slideSpeed = 5f; // How fast to slide off the wall
+
+    [Header("Attack")]
+public float attack1Duration = 0.35f;
+public float attack2Duration = 0.55f;
+public bool lockMovementDuringAttack = true;
+
+public float attack1Delay = 0.15f;
+public float attack2Delay = 0.25f;
+float attackCooldownTimer;
+
+[Header("Attack VFX")]
+public GameObject attack1VfxPrefab;
+public Vector2 attack1VfxOffsetRight = new Vector2(0.6f, 0.1f);
+public Vector2 attack1VfxOffsetLeft = new Vector2(-0.6f, 0.1f);
+public Vector3 attack1VfxScale = Vector3.one;
+public float attack1Radius = 0.8f;
+
+
+[Header("Attack 2 VFX")]
+public GameObject attack2VfxPrefab;
+public Vector2 attack2LeftOffset = new Vector2(-0.2f, 0.15f);
+public Vector2 attack2RightOffset = new Vector2(0.2f, 0.15f);
+public float attack2ProjectileSpeed = 8f;
+public float attack2Radius = 0.8f;
+public Vector3 attack2ProjectileScale = Vector3.one;
 
     [Header("Dash Jump Combo")]
     public float dashJumpForwardBoost = 7f;
@@ -34,9 +54,6 @@ public float slideSpeed = 5f; // How fast to slide off the wall
 
     [Header("Air Control")]
     public float airControl = 0.6f;
-
-    [Header("High Ground Area")]
-    public Collider2D highGroundArea;
 
     [Header("Shadow")]
     public Vector2 shadowMinScale = new Vector2(0.25f, 0.15f);
@@ -66,13 +83,16 @@ public float slideSpeed = 5f; // How fast to slide off the wall
     Vector2 dashDirection;
 
     bool isJumping;
-    bool wasHighGroundJump = false; // Tracks if the current jump started on high ground
     bool isDashing;
     bool dashLocked;
 
     float dashLockTimer;
     float jumpTimer;
     float dashTimer;
+
+    bool isAttacking;
+float attackTimer;
+public bool IsAttacking => isAttacking;
 
     Vector3 visualBasePos;
     Vector3 shadowBasePos;
@@ -83,11 +103,6 @@ public float slideSpeed = 5f; // How fast to slide off the wall
     bool jumpQueued;
     float jumpBufferTimer;
     float jumpBufferTime = 0.55f;
-
-    List<Collider2D> ignoredWalls = new List<Collider2D>();
-
-    int playerLayer;
-    int jumpBlockLayer;
 
     public bool IsJumping => isJumping;
     public bool IsDashing => isDashing;
@@ -105,9 +120,6 @@ public float slideSpeed = 5f; // How fast to slide off the wall
         visualBasePos = visual.localPosition;
         shadowBasePos = shadow.localPosition;
         shadowBaseScale = shadow.localScale;
-
-        playerLayer = LayerMask.NameToLayer("Player");
-        jumpBlockLayer = LayerMask.NameToLayer("JumpBlock");
     }
 
     void OnEnable()
@@ -122,6 +134,9 @@ public float slideSpeed = 5f; // How fast to slide off the wall
 
         input.Gameplay.Jump.performed += _ => QueueJump();
         input.Gameplay.Dash.performed += _ => TryStartDash();
+
+        input.Gameplay.Attack1.performed += _ => TryAttack1();
+input.Gameplay.Attack2.performed += _ => TryAttack2();
     }
 
     void OnDisable()
@@ -149,6 +164,12 @@ public float slideSpeed = 5f; // How fast to slide off the wall
         {
             rb.linearVelocity = moveInput * moveSpeed;
         }
+
+        if (isAttacking && lockMovementDuringAttack)
+{
+    rb.linearVelocity = Vector2.zero;
+    return;
+}
     }
 
     void Update()
@@ -159,7 +180,8 @@ public float slideSpeed = 5f; // How fast to slide off the wall
             if (jumpBufferTimer <= 0f)
                 jumpQueued = false;
         }
-
+        if (attackCooldownTimer > 0f)
+    attackCooldownTimer -= Time.deltaTime;
         UpdateFacing();
         UpdateAnimation();
         UpdateJump();
@@ -167,12 +189,14 @@ public float slideSpeed = 5f; // How fast to slide off the wall
         UpdateRunDust();
         UpdateDash();
         UpdateDashCooldown();
+        UpdateAttack();
     }
 
     void TryStartDash()
     {
         if (isDashing) return;
         if (dashLocked) return;
+        if (isAttacking) CancelAttack();
 
         StartDash();
     }
@@ -283,11 +307,14 @@ public float slideSpeed = 5f; // How fast to slide off the wall
 
     void QueueJump()
     {
+        
         if (!isDashing)
         {
             StartJump();
             return;
         }
+        if (isAttacking)
+        CancelAttack();
 
         jumpQueued = true;
         jumpBufferTimer = jumpBufferTime;
@@ -307,104 +334,52 @@ public float slideSpeed = 5f; // How fast to slide off the wall
         animator.SetFloat("Speed", rb.linearVelocity.sqrMagnitude);
     }
 
-  void StartJump()
-{
-    if (isJumping) return;
-
-    bool insideHighGround = (highGroundArea != null && highGroundArea.IsTouching(playerCollider));
-    wasHighGroundJump = insideHighGround;
-
-    // Default duration
-    currentJumpDuration = jumpDuration;
-
-    if (insideHighGround)
+    void StartJump()
     {
-        Physics2D.IgnoreLayerCollision(playerLayer, jumpBlockLayer, true);
-
-        Vector2 moveInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-        if (moveInput.sqrMagnitude > 0.01f) 
-        {
-            // USE STRONGER PUSH: downJumpForce instead of 3f
-            rb.linearVelocity = moveInput.normalized * downJumpForce;
-        }
-
-        // USE LONGER DURATION: to give them time to fly over the 2 blocks
-        currentJumpDuration = downJumpDuration;
         
-        dashJumpMomentum = Vector2.zero; 
+        if (isJumping) return;
+
         isJumping = true;
         jumpTimer = 0f;
+
+        dashJumpMomentum = rb.linearVelocity;
+
+        if (isDashing)
+        {
+            dashJumpMomentum = Vector2.Lerp(
+                rb.linearVelocity,
+                dashDirection * dashJumpForwardBoost,
+                0.5f
+            );
+        }
+
         animator.SetTrigger("Jump");
-        return; 
     }
 
-    // Normal jump logic...
-    isJumping = true;
-    jumpTimer = 0f;
-    dashJumpMomentum = rb.linearVelocity;
-
-    if (isDashing)
-    {
-        dashJumpMomentum = Vector2.Lerp(
-            rb.linearVelocity,
-            dashDirection * dashJumpForwardBoost,
-            0.5f
-        );
-    }
-
-    animator.SetTrigger("Jump");
-}
     void UpdateJump()
-{
-    if (!isJumping) return;
-
-    jumpTimer += Time.deltaTime;
-    // USE THE DYNAMIC DURATION
-    float t = Mathf.Clamp01(jumpTimer / currentJumpDuration);
-
-    float heightMultiplier = wasHighGroundJump ? dashJumpHeightMultiplier : 1f;
-    float h = jumpCurve.Evaluate(t) * heightMultiplier;
-
-    visual.localPosition = visualBasePos + Vector3.up * (h * jumpHeight);
-    shadow.localScale = Vector3.Lerp(shadowBaseScale, shadowMinScale, h);
-
-    if (t >= 1f)
-{
-    isJumping = false;
-    visual.localPosition = visualBasePos;
-    shadow.localScale = shadowBaseScale;
-
-    // Pass the direction we were moving so we know which way to slide
-    Vector2 slideDir = rb.linearVelocity.normalized;
-    StartCoroutine(RestoreWallCollision(slideDir));
-}
-}
-
-    IEnumerator RestoreWallCollision(Vector2 slideDirection)
-{
-    // 1. Check if we are currently overlapping a wall
-    // This uses the player's collider to see if it's hitting the jumpBlockLayer
-    ContactFilter2D filter = new ContactFilter2D();
-    filter.SetLayerMask(jumpBlockLayer);
-    filter.useTriggers = false;
-
-    Collider2D[] results = new Collider2D[1];
-    
-    // 2. While the player is still "inside" the wall, keep sliding
-    while (playerCollider.Overlap(filter, results) > 0)
     {
-        // Keep collisions off so we don't get stuck/pop up
-        Physics2D.IgnoreLayerCollision(playerLayer, jumpBlockLayer, true);
-        
-        // Slide the player in the direction they were jumping
-        rb.linearVelocity = slideDirection * slideSpeed;
-        
-        yield return null; // Wait for next frame
-    }
+        if (!isJumping) return;
 
-    // 3. Once clear of the wall, restore normal physics
-    Physics2D.IgnoreLayerCollision(playerLayer, jumpBlockLayer, false);
-}
+        jumpTimer += Time.deltaTime;
+
+        float t = Mathf.Clamp01(jumpTimer / jumpDuration);
+
+        float heightMultiplier = dashJumpMomentum != Vector2.zero ? dashJumpHeightMultiplier : 1f;
+
+        float h = jumpCurve.Evaluate(t) * heightMultiplier;
+
+        visual.localPosition = visualBasePos + Vector3.up * (h * jumpHeight);
+
+        shadow.localScale = Vector3.Lerp(shadowBaseScale, shadowMinScale, h);
+
+        if (t >= 1f)
+        {
+            isJumping = false;
+
+            visual.localPosition = visualBasePos;
+            shadow.localScale = shadowBaseScale;
+        }
+    }
 
     void UpdateShadowOffset()
     {
@@ -460,6 +435,171 @@ public float slideSpeed = 5f; // How fast to slide off the wall
         if (!activeRunDust) return;
 
         Destroy(activeRunDust);
+
         activeRunDust = null;
     }
+
+  void TryAttack1()
+{
+    if (isDashing) return;
+    if (attackCooldownTimer > 0f) return;
+
+    if (isAttacking)
+        CancelAttack();
+
+    StartAttack1();
+}
+
+void TryAttack2()
+{
+    if (isDashing) return;
+    if (attackCooldownTimer > 0f) return;
+
+    if (isAttacking)
+        CancelAttack();
+
+    StartAttack2();
+}
+
+void StartAttack1()
+{
+    isAttacking = true;
+    attackTimer = attack1Duration;
+    attackCooldownTimer = attack1Delay;
+    animator.SetTrigger("Attack1");
+}
+
+void StartAttack2()
+{
+    isAttacking = true;
+    attackTimer = attack2Duration;
+    attackCooldownTimer = attack2Delay;
+    animator.SetTrigger("Attack2");
+}
+void UpdateAttack()
+{
+    if (!isAttacking) return;
+
+    attackTimer -= Time.deltaTime;
+
+    if (attackTimer <= 0f)
+    {
+        isAttacking = false;
+    }
+}
+
+public void SpawnAttack1VFX()
+{
+    if (attack1VfxPrefab == null) return;
+
+    Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(
+        new Vector3(mouseScreenPos.x, mouseScreenPos.y, 10f)
+    );
+
+    Vector2 dir = (Vector2)(mouseWorld - transform.position);
+
+    if (dir.sqrMagnitude < 0.001f)
+        dir = Vector2.right;
+    else
+        dir.Normalize();
+
+    GameObject vfx = Instantiate(attack1VfxPrefab, transform);
+
+    vfx.transform.localPosition = new Vector3(dir.x * attack1Radius, dir.y * attack1Radius, 0f);
+
+    float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+    vfx.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+
+    Vector3 finalScale = attack1VfxScale;
+
+    if (dir.x < 0f)
+        finalScale.y = -Mathf.Abs(finalScale.y);
+    else
+        finalScale.y = Mathf.Abs(finalScale.y);
+
+    vfx.transform.localScale = finalScale;
+    StartCoroutine(UpdateAttackVfxSorting(vfx));
+}
+IEnumerator UpdateAttackVfxSorting(GameObject fx)
+{
+    SpriteRenderer playerRenderer = sprite;
+    SpriteRenderer[] srs = fx.GetComponentsInChildren<SpriteRenderer>();
+    ParticleSystemRenderer[] ps = fx.GetComponentsInChildren<ParticleSystemRenderer>();
+
+    while (fx != null)
+    {
+        int order = playerRenderer.sortingOrder + 1;
+
+        foreach (SpriteRenderer r in srs)
+        {
+            r.sortingLayerName = playerRenderer.sortingLayerName;
+            r.sortingOrder = order;
+        }
+
+        foreach (ParticleSystemRenderer p in ps)
+        {
+            p.sortingLayerName = playerRenderer.sortingLayerName;
+            p.sortingOrder = order;
+        }
+
+        yield return null;
+    }
+}
+
+
+public void SpawnAttack2VFX_Left()
+{
+    SpawnAttack2Projectile(attack2LeftOffset);
+}
+
+public void SpawnAttack2VFX_Right()
+{
+    SpawnAttack2Projectile(attack2RightOffset);
+}
+void SpawnAttack2Projectile(Vector2 localOffset)
+{
+    if (attack2VfxPrefab == null) return;
+
+    Vector2 dir = GetMouseDirection();
+    Vector3 spawnPosition = transform.position + (Vector3)(dir * attack2Radius);
+
+    GameObject vfx = Instantiate(attack2VfxPrefab, spawnPosition, Quaternion.identity);
+
+Collider2D projectileCol = vfx.GetComponent<Collider2D>();
+if (projectileCol != null && playerCollider != null)
+{
+    Physics2D.IgnoreCollision(projectileCol, playerCollider);
+}
+
+    Vector3 finalScale = attack2ProjectileScale;
+    vfx.transform.localScale = finalScale;
+
+    Attack2Projectile projectile = vfx.GetComponent<Attack2Projectile>();
+    if (projectile != null)
+    {
+        projectile.speed = attack2ProjectileSpeed;
+        projectile.SetDirection(dir);
+    }
+}
+Vector2 GetMouseDirection()
+{
+    Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(
+        new Vector3(mouseScreenPos.x, mouseScreenPos.y, 10f)
+    );
+
+    Vector2 dir = (mouseWorld - transform.position);
+    return dir.normalized;
+}
+void CancelAttack()
+{
+    if (!isAttacking) return;
+
+    isAttacking = false;
+    attackTimer = 0f;
+
+    animator.ResetTrigger("Attack1");
+    animator.ResetTrigger("Attack2");
+
+    animator.Play("Pyra_Idle");
+}
 }
