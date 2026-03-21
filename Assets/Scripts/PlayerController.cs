@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Collider2D))]
@@ -13,6 +14,17 @@ public class PlayerController : MonoBehaviour
     public float dashSpeed = 18f;
     public float dashDuration = 0.18f;
     public float dashCooldown = 0.5f;
+
+    [Header("Dash Damage")]
+public float dashDamage = 4f;
+public float dashRadius = 0.6f;
+public LayerMask dashHitLayers;
+// 🔥 DASH OPTIMIZATION
+Collider2D[] dashHitsBuffer = new Collider2D[50];
+float dashDamageInterval = 0.05f;
+float dashDamageTimer;
+
+HashSet<EnemyController> hitEnemies = new HashSet<EnemyController>();
 
     [Header("Dash FX")]
     public GameObject dashFxPrefab;
@@ -32,12 +44,21 @@ public float attack1Delay = 0.15f;
 public float attack2Delay = 0.25f;
 float attackCooldownTimer;
 
-[Header("Attack VFX")]
+[Header("Attack 1 VFX")]
 public GameObject attack1VfxPrefab;
 public Vector2 attack1VfxOffsetRight = new Vector2(0.6f, 0.1f);
 public Vector2 attack1VfxOffsetLeft = new Vector2(-0.6f, 0.1f);
 public Vector3 attack1VfxScale = Vector3.one;
 public float attack1Radius = 0.8f;
+public float attack1Force = 6f;
+public LayerMask attack1AffectLayers;
+public float attack1Damage = 5f;
+bool attack1Held;
+
+
+[Header("Attack 1 Arc Settings")]
+public float attack1Range = 1.2f;
+public float attack1Angle = 110f; // arc width
 
 
 [Header("Attack 2 VFX")]
@@ -47,6 +68,7 @@ public Vector2 attack2RightOffset = new Vector2(0.2f, 0.15f);
 public float attack2ProjectileSpeed = 8f;
 public float attack2Radius = 0.8f;
 public Vector3 attack2ProjectileScale = Vector3.one;
+bool attack2Held;
 
     [Header("Dash Jump Combo")]
     public float dashJumpForwardBoost = 7f;
@@ -85,10 +107,14 @@ public Vector3 attack2ProjectileScale = Vector3.one;
     bool isJumping;
     bool isDashing;
     bool dashLocked;
+    bool dashHitstopTriggered;
 
     float dashLockTimer;
     float jumpTimer;
     float dashTimer;
+    int playerLayer;
+int enemyLayer;
+    
 
     bool isAttacking;
 float attackTimer;
@@ -120,6 +146,8 @@ public bool IsAttacking => isAttacking;
         visualBasePos = visual.localPosition;
         shadowBasePos = shadow.localPosition;
         shadowBaseScale = shadow.localScale;
+        playerLayer = LayerMask.NameToLayer("Player");
+enemyLayer = LayerMask.NameToLayer("Enemy");
     }
 
     void OnEnable()
@@ -135,13 +163,17 @@ public bool IsAttacking => isAttacking;
         input.Gameplay.Jump.performed += _ => QueueJump();
         input.Gameplay.Dash.performed += _ => TryStartDash();
 
-        input.Gameplay.Attack1.performed += _ => TryAttack1();
-input.Gameplay.Attack2.performed += _ => TryAttack2();
+       input.Gameplay.Attack1.performed += _ => attack1Held = true;
+input.Gameplay.Attack1.canceled += _ => attack1Held = false;
+
+input.Gameplay.Attack2.performed += _ => attack2Held = true;
+input.Gameplay.Attack2.canceled += _ => attack2Held = false;
     }
 
     void OnDisable()
     {
         input.Gameplay.Disable();
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
     }
 
     void FixedUpdate()
@@ -190,6 +222,7 @@ input.Gameplay.Attack2.performed += _ => TryAttack2();
         UpdateDash();
         UpdateDashCooldown();
         UpdateAttack();
+        HandleAttackHold();
     }
 
     void TryStartDash()
@@ -204,7 +237,11 @@ input.Gameplay.Attack2.performed += _ => TryAttack2();
     void StartDash()
     {
         isDashing = true;
+        dashHitstopTriggered = false;
+        dashDamageTimer = 0f;
         dashTimer = 0f;
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);
+        hitEnemies.Clear();
 
         if (moveInput.sqrMagnitude > 0.01f)
             dashDirection = moveInput.normalized;
@@ -224,30 +261,46 @@ input.Gameplay.Attack2.performed += _ => TryAttack2();
     }
 
     void UpdateDash()
+{
+    if (!isDashing) return;
+
+    dashTimer += Time.deltaTime;
+    dashDamageTimer -= Time.deltaTime;
+
+if (dashDamageTimer <= 0f)
+{
+    DealDashDamage();
+    dashDamageTimer = dashDamageInterval;
+}
+    if (dashTimer >= dashDuration)
     {
-        if (!isDashing) return;
-
-        dashTimer += Time.deltaTime;
-
-        if (dashTimer >= dashDuration)
-        {
-            isDashing = false;
-
-            if (!isJumping)
-                rb.linearVelocity = Vector2.zero;
-
-            visual.gameObject.SetActive(true);
-
-            dashLocked = true;
-            dashLockTimer = 0f;
-
-            if (jumpQueued)
-            {
-                jumpQueued = false;
-                StartJump();
-            }
-        }
+        EndDash();
     }
+}
+
+void EndDash()
+{
+    isDashing = false;
+
+    // 🔥 RESTORE COLLISION
+    if (playerLayer != -1 && enemyLayer != -1)
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
+
+    // 🔥 RESTORE VISUAL
+    visual.gameObject.SetActive(true);
+
+    if (!isJumping)
+        rb.linearVelocity = Vector2.zero;
+
+    dashLocked = true;
+    dashLockTimer = 0f;
+
+    if (jumpQueued)
+    {
+        jumpQueued = false;
+        StartJump();
+    }
+}
 
     void UpdateDashCooldown()
     {
@@ -503,6 +556,51 @@ public void SpawnAttack1VFX()
     else
         dir.Normalize();
 
+    float attackRange = attack1Range;
+    float attackAngle = attack1Angle;
+
+    float minDistanceAlwaysHit = 0.2f; // 🔥 CLOSE RANGE FIX
+
+    Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, attackRange, attack1AffectLayers);
+
+    foreach (Collider2D hit in hits)
+    {
+        Rigidbody2D hitRb = hit.attachedRigidbody;
+        EnemyController enemy = hit.GetComponent<EnemyController>();
+if (enemy != null && enemy.IsDead) continue;
+        if (hitRb == null) continue;
+
+        Vector2 toTarget = (hitRb.position - (Vector2)transform.position);
+        float distance = toTarget.magnitude;
+
+        if (distance > attackRange) continue;
+        EnemyController e = hit.GetComponent<EnemyController>();
+if (e != null && e.IsDead) continue;
+    if (enemy != null)
+    {
+        enemy.TakeDamage(attack1Damage);
+    }
+
+        // 🔥 FIX: always hit very close targets
+        if (distance < minDistanceAlwaysHit)
+        {
+            Vector2 pushDir = (toTarget + dir).normalized;
+            hitRb.AddForce(pushDir * attack1Force, ForceMode2D.Impulse);
+            continue;
+        }
+
+        toTarget.Normalize();
+
+        float hitAngle = Vector2.Angle(dir, toTarget);
+
+        if (hitAngle <= attackAngle * 0.5f)
+        {
+            Vector2 pushDir = (toTarget + dir * 0.5f).normalized;
+            hitRb.AddForce(pushDir * attack1Force, ForceMode2D.Impulse);
+        }
+    }
+
+    // --- VFX (unchanged) ---
     GameObject vfx = Instantiate(attack1VfxPrefab, transform);
 
     vfx.transform.localPosition = new Vector3(dir.x * attack1Radius, dir.y * attack1Radius, 0f);
@@ -518,6 +616,7 @@ public void SpawnAttack1VFX()
         finalScale.y = Mathf.Abs(finalScale.y);
 
     vfx.transform.localScale = finalScale;
+
     StartCoroutine(UpdateAttackVfxSorting(vfx));
 }
 IEnumerator UpdateAttackVfxSorting(GameObject fx)
@@ -601,5 +700,88 @@ void CancelAttack()
     animator.ResetTrigger("Attack2");
 
     animator.Play("Pyra_Idle");
+}
+
+void OnDrawGizmosSelected()
+{
+
+    Gizmos.color = Color.red;
+
+    Vector2 dir;
+
+if (Application.isPlaying)
+    dir = GetMouseDirection();
+else
+    dir = Vector2.right; // fallback in editor
+    Vector3 dir3 = (Vector3)dir;
+
+    Vector3 origin = transform.position;
+
+    float halfAngle = attack1Angle * 0.5f;
+    int segments = 20;
+
+    Vector3 prevPoint = origin;
+
+    for (int i = 0; i <= segments; i++)
+    {
+        float t = (float)i / segments;
+        float angle = -halfAngle + (attack1Angle * t);
+
+        Vector3 rotatedDir = Quaternion.Euler(0, 0, angle) * dir3;
+        Vector3 point = origin + rotatedDir * attack1Range;
+
+        Gizmos.DrawLine(prevPoint, point);
+        prevPoint = point;
+    }
+
+    // center line
+    Gizmos.color = Color.yellow;
+    Gizmos.DrawLine(origin, origin + dir3 * attack1Range);
+}
+void HandleAttackHold()
+{
+    if (attack2Held)
+    {
+        TryAttack2();
+    }
+    else if (attack1Held)
+    {
+        TryAttack1();
+    }
+}
+
+void DealDashDamage()
+{
+    // 🔥 slightly forward hitbox (feels better)
+    Vector2 center = (Vector2)transform.position + dashDirection * 0.4f;
+
+    int hitCount = Physics2D.OverlapCircleNonAlloc(
+        center,
+        dashRadius,
+        dashHitsBuffer,
+        dashHitLayers
+    );
+
+    for (int i = 0; i < hitCount; i++)
+    {
+        Collider2D hit = dashHitsBuffer[i];
+
+        EnemyController enemy = hit.GetComponent<EnemyController>();
+
+        if (enemy == null) continue;
+        if (enemy.IsDead) continue;
+        if (hitEnemies.Contains(enemy)) continue;
+
+       enemy.TakeDamage(dashDamage, false);
+
+        Rigidbody2D enemyRb = enemy.GetComponent<Rigidbody2D>();
+if (enemyRb != null)
+{
+    Vector2 pushDir = (enemy.transform.position - transform.position).normalized;
+    enemyRb.AddForce(pushDir * 2f, ForceMode2D.Impulse);
+}
+
+        hitEnemies.Add(enemy);
+    }
 }
 }

@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 4008157166289068341}
   - component: {fileID: 977829461757963175}
   - component: {fileID: 4541302676171091301}
-  - component: {fileID: 6343147217310313212}
   m_Layer: 0
   m_Name: Pyra_Dash
   m_TagString: Untagged
@@ -60,7 +59,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 83c4b0e2e8135f3438d43b3e78c8f4fb, type: 2}
+  - {fileID: 2100000, guid: 2b27e111e9380ce49aba08f179bc98f2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -115,20 +114,3 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &6343147217310313212
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 242446433976300655}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c49bfa5f3abf37945b23653fd0512a50, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RuneGlowController
-  runeGlows: []
-  glowColor: {r: 1, g: 0.40170395, b: 0, a: 1}
-  glowIntensity: 20.21
-  glowDelay: 0
-  alwaysGlow: 1

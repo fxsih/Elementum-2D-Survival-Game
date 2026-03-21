@@ -4,6 +4,8 @@ Shader "Custom/PaletteSwap_LUT"
     {
         _MainTex ("Sprite", 2D) = "white" {}
         _PaletteTex ("Palette", 2D) = "white" {}
+
+        _EmissionStrength ("Emission Strength", Float) = 2.0
     }
 
     SubShader
@@ -45,6 +47,8 @@ Shader "Custom/PaletteSwap_LUT"
             TEXTURE2D(_PaletteTex);
             SAMPLER(sampler_PaletteTex);
 
+            float _EmissionStrength;
+
             Varyings vert (Attributes v)
             {
                 Varyings o;
@@ -57,7 +61,7 @@ Shader "Custom/PaletteSwap_LUT"
             {
                 float4 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv);
 
-                // Use RED channel as palette index
+                // palette lookup
                 float index = color.r;
 
                 float4 paletteColor =
@@ -65,7 +69,13 @@ Shader "Custom/PaletteSwap_LUT"
 
                 paletteColor.a = color.a;
 
-                return paletteColor;
+                // 🔥 ADD EMISSION (this is the key)
+                float3 emission = paletteColor.rgb * _EmissionStrength;
+
+                // Add emission to base color (for bloom)
+                float3 finalColor = paletteColor.rgb + emission;
+
+                return float4(finalColor, paletteColor.a);
             }
 
             ENDHLSL

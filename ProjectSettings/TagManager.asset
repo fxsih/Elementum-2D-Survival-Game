@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 3
   tags:
   - DepthBase
+  - Enemy
   layers:
   - Default
   - TransparentFX
@@ -16,10 +17,10 @@ TagManager:
   - WallLower
   - HigherGround
   - Ground
-  - 
-  - 
-  - 
-  - 
+  - interactable objects
+  - OBSTACLE
+  - Ocean and LAVA
+  - Enemy
   - 
   - 
   - 

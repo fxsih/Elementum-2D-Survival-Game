@@ -8,6 +8,7 @@ public class Attack2Projectile : MonoBehaviour
     public float explosionRadius = 1.5f;
 public float explosionForce = 6f;
 public LayerMask explosionAffectLayers;
+public float attack2Damage = 8f;
 
     Rigidbody2D rb;
     Vector2 direction;
@@ -64,6 +65,16 @@ public LayerMask explosionAffectLayers;
         Instantiate(explosionPrefab, transform.position, Quaternion.identity);
 
     Destroy(gameObject);
+    Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
+
+foreach (Collider2D hit in hits)
+{
+    EnemyController enemy = hit.GetComponent<EnemyController>();
+    if (enemy != null)
+    {
+        enemy.TakeDamage(attack2Damage);
+    }
+}
 }
     void ApplyExplosionForce()
 {
@@ -72,6 +83,8 @@ public LayerMask explosionAffectLayers;
     foreach (Collider2D hit in hits)
     {
         Rigidbody2D hitRb = hit.attachedRigidbody;
+        EnemyController enemy = hit.GetComponent<EnemyController>();
+if (enemy != null && enemy.IsDead) continue;
         if (hitRb == null) continue;
 
         Vector2 dir = (hitRb.position - (Vector2)transform.position);
