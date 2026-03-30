@@ -31,32 +31,34 @@ public class GameOverManager : MonoBehaviour
         deathPanel.SetActive(true);
     }
 
-    public void Respawn()
+   public void Respawn()
+{
+    StartCoroutine(RespawnRoutine());
+}
+
+IEnumerator RespawnRoutine()
+{
+    Time.timeScale = 1f;
+
+    yield return null;
+
+    var tm = EasyTransition.TransitionManager.Instance();
+
+    if (tm != null && transition != null)
     {
-        Time.timeScale = 1f;
-        StartCoroutine(RespawnRoutine());
+        tm.Transition(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name,
+            transition,
+            0f
+        );
     }
-
-    IEnumerator RespawnRoutine()
+    else
     {
-        yield return new WaitForSeconds(0.1f);
-
-        var tm = TransitionManager.Instance();
-
-        if (tm != null && transition != null)
-        {
-            tm.Transition(
-                SceneManager.GetActiveScene().name,
-                transition,
-                0f
-            );
-        }
-        else
-        {
-            Debug.LogError("❌ Transition failed → fallback reload");
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        }
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+        );
     }
+}
 
     public void GoToMenu()
     {

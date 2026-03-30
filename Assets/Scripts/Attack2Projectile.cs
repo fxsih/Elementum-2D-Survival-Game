@@ -9,7 +9,7 @@ public class Attack2Projectile : MonoBehaviour
 public float explosionForce = 6f;
 public LayerMask explosionAffectLayers;
 public float attack2Damage = 8f;
-
+float bonusDamage;
     Rigidbody2D rb;
     Vector2 direction;
     bool hasHit;
@@ -23,6 +23,11 @@ public float attack2Damage = 8f;
     {
         Destroy(gameObject, lifeTime);
     }
+
+    public void SetDamage(float extraDamage)
+{
+    bonusDamage = extraDamage;
+}
 
     public void SetDirection(Vector2 dir)
     {
@@ -72,7 +77,7 @@ foreach (Collider2D hit in hits)
     EnemyController enemy = hit.GetComponent<EnemyController>();
     if (enemy != null)
     {
-        enemy.TakeDamage(attack2Damage);
+       enemy.TakeDamage(attack2Damage + bonusDamage);
     }
 }
 }

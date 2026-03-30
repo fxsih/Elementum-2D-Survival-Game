@@ -12,6 +12,9 @@ public class GameManager : MonoBehaviour
     public int storedGems = 0;
     public int baseRequirement = 10;
 
+    int pendingGems = 0;
+bool isProcessing = false;
+
     [Header("Level Requirements")]
     public int[] levelRequirements;
 
@@ -43,46 +46,72 @@ public class GameManager : MonoBehaviour
     }
 
     // ---------------- GEMS ----------------
-    public void AddGems(int amount)
+   public void AddGems(int amount)
+{
+    pendingGems += amount;
+
+    if (!isProcessing)
     {
-        StartCoroutine(ProcessDeposit(amount));
+        StartCoroutine(ProcessDeposit());
     }
+}
 
-    IEnumerator ProcessDeposit(int amount)
+ IEnumerator ProcessDeposit()
+{
+    isProcessing = true;
+
+    while (pendingGems > 0)
     {
-        while (amount > 0)
+        int required = GetRequiredGems();
+
+        int needed = required - storedGems;
+        int toAdd = Mathf.Min(pendingGems, needed);
+
+        storedGems += toAdd;
+        pendingGems -= toAdd;
+
+        // 🔥 Animate
+        if (NexusProgressUI.Instance != null)
         {
-            int required = GetRequiredGems();
-            int needed = required - storedGems;
+            yield return NexusProgressUI.Instance.AnimateStep(
+                storedGems,
+                required,
+                currentLevel
+            );
+        }
 
-            int toAdd = Mathf.Min(amount, needed);
-
-            storedGems += toAdd;
-            amount -= toAdd;
-
+        // 🔥 LEVEL UP
+        if (storedGems >= required)
+        {
             if (NexusProgressUI.Instance != null)
             {
-                yield return NexusProgressUI.Instance.AnimateStep(
+                yield return NexusProgressUI.Instance.AnimateLevelUp(currentLevel + 1);
+            }
+
+            storedGems = 0;
+            currentLevel++;
+
+            // 🔥 Update UI
+            if (NexusProgressUI.Instance != null)
+            {
+                NexusProgressUI.Instance.ForceResetUI(
                     storedGems,
-                    required,
+                    GetRequiredGems(),
                     currentLevel
                 );
             }
 
-            if (storedGems >= required)
-            {
-                storedGems = 0;
-                currentLevel++;
+            // 🔥 STOP HERE (WAIT FOR PLAYER)
+            isProcessing = false;
 
-                if (NexusProgressUI.Instance != null)
-                {
-                    yield return NexusProgressUI.Instance.AnimateLevelUp(currentLevel);
-                }
+            UpgradeManager.Instance.ShowUpgrades();
 
-                Debug.Log("LEVEL UP! Level: " + currentLevel);
-            }
+            yield break; // 🔥 CRITICAL
         }
     }
+
+    isProcessing = false;
+}
 
     int GetRequiredGems()
     {

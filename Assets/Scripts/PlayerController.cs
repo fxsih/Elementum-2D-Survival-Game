@@ -19,6 +19,8 @@ bool isDead = false;
 public float knockbackForce = 8f;
 public float knockbackDuration = 0.2f;
 
+public HealthBarUI healthUI;
+
 
 float knockbackTimer;
 Vector2 knockbackDirection;
@@ -105,6 +107,10 @@ bool attack2Held;
     public GameObject runDustPrefab;
     public Vector2 runDustOffsetRight = Vector2.zero;
     public Vector2 runDustOffsetLeft = new Vector2(-0.5f, 0f);
+
+    [Header("Upgrade Stats")]
+public float damage = 0f;        // bonus damage
+public float attackSpeed = 1f;   // multiplier (1 = normal)
 
     Rigidbody2D rb;
     Collider2D playerCollider;
@@ -239,7 +245,7 @@ input.Gameplay.Attack2.canceled += _ => attack2Held = false;
                 jumpQueued = false;
         }
         if (attackCooldownTimer > 0f)
-            attackCooldownTimer -= Time.deltaTime;
+    attackCooldownTimer -= Time.deltaTime * attackSpeed;
         if (invulnTimer > 0f)
             {
                 invulnTimer -= Time.deltaTime;
@@ -580,7 +586,7 @@ void UpdateAttack()
 {
     if (!isAttacking) return;
 
-    attackTimer -= Time.deltaTime;
+    attackTimer -= Time.deltaTime * attackSpeed;
 
     if (attackTimer <= 0f)
     {
@@ -624,28 +630,28 @@ if (enemy != null && enemy.IsDead) continue;
         EnemyController e = hit.GetComponent<EnemyController>();
 if (e != null && e.IsDead) continue;
     if (enemy != null)
+{
+    // 🔥 CLOSE RANGE ALWAYS HIT
+    if (distance < minDistanceAlwaysHit)
     {
-        enemy.TakeDamage(attack1Damage);
+        enemy.TakeDamage(attack1Damage + damage);
+
+        Vector2 pushDir = (toTarget + dir).normalized;
+        hitRb.AddForce(pushDir * attack1Force, ForceMode2D.Impulse);
+        continue;
     }
 
-        // 🔥 FIX: always hit very close targets
-        if (distance < minDistanceAlwaysHit)
-        {
-            Vector2 pushDir = (toTarget + dir).normalized;
-            hitRb.AddForce(pushDir * attack1Force, ForceMode2D.Impulse);
-            continue;
-        }
+    toTarget.Normalize();
+    float hitAngle = Vector2.Angle(dir, toTarget);
 
-        toTarget.Normalize();
+    if (hitAngle <= attackAngle * 0.5f)
+    {
+        enemy.TakeDamage(attack1Damage + damage); // ✅ MOVED HERE
 
-        float hitAngle = Vector2.Angle(dir, toTarget);
-
-        if (hitAngle <= attackAngle * 0.5f)
-        {
-            Vector2 pushDir = (toTarget + dir * 0.5f).normalized;
-            hitRb.AddForce(pushDir * attack1Force, ForceMode2D.Impulse);
-        }
+        Vector2 pushDir = (toTarget + dir * 0.5f).normalized;
+        hitRb.AddForce(pushDir * attack1Force, ForceMode2D.Impulse);
     }
+}}
 
     // --- VFX (unchanged) ---
     GameObject vfx = Instantiate(attack1VfxPrefab, transform);
@@ -725,6 +731,7 @@ if (projectileCol != null && playerCollider != null)
     {
         projectile.speed = attack2ProjectileSpeed;
         projectile.SetDirection(dir);
+projectile.SetDamage(damage); // 🔥 THIS LINE FIXES IT
     }
 }
 Vector2 GetMouseDirection()
@@ -819,8 +826,7 @@ void DealDashDamage()
         if (enemy.IsDead) continue;
         if (hitEnemies.Contains(enemy)) continue;
 
-       enemy.TakeDamage(dashDamage, false);
-
+       enemy.TakeDamage(dashDamage + damage, false);
         Rigidbody2D enemyRb = enemy.GetComponent<Rigidbody2D>();
 if (enemyRb != null)
 {
@@ -836,8 +842,10 @@ public void TakeDamage(float damage, Vector2 hitDirection)
 {
     if (isDead) return;
     if (invulnTimer > 0f) return;
-
+    
     currentHealth -= damage;
+    if (healthUI != null)
+    healthUI.UpdateHealth(currentHealth, maxHealth);
 
     invulnTimer = invulnTime;
 
@@ -915,8 +923,41 @@ public void Heal(float amount)
     if (isDead) return;
 
     currentHealth += amount;
+currentHealth = Mathf.Min(currentHealth, maxHealth);
 
-    // Clamp so it doesn’t exceed max
-    currentHealth = Mathf.Min(currentHealth, maxHealth);
+if (healthUI != null)
+    healthUI.UpdateHealth(currentHealth, maxHealth);
+}
+
+public void ApplyUpgrade(UpgradeData upgrade)
+{
+    switch (upgrade.type)
+    {
+        case UpgradeType.Speed:
+            moveSpeed += upgrade.value;
+            break;
+
+        case UpgradeType.Damage:
+            damage += upgrade.value;
+            break;
+
+        case UpgradeType.AttackSpeed:
+            attackSpeed += upgrade.value;
+            break;
+
+        case UpgradeType.Health:
+    maxHealth += upgrade.value;
+    currentHealth = Mathf.Min(currentHealth + upgrade.value, maxHealth);
+
+    if (healthUI != null)
+    {
+        healthUI.UpdateBarSize(maxHealth); // ⭐ THIS IS STEP 3
+        healthUI.UpdateHealth(currentHealth, maxHealth);
+    }
+
+    break;
+    }
+
+    Debug.Log("Upgrade Applied: " + upgrade.upgradeName);
 }
 }

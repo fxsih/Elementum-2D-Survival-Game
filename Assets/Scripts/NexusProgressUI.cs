@@ -110,32 +110,32 @@ public class NexusProgressUI : MonoBehaviour
         fillImage.fillAmount = target;
     }
 
-    IEnumerator SmoothNumber(int targetValue, int required)
-    {
-        if (progressText == null) yield break;
+   IEnumerator SmoothNumber(int targetValue, int required)
+{
+    if (progressText == null) yield break;
 
-        float currentValue = displayedValue; // 🔥 use float internally
-
-        while (Mathf.Abs(currentValue - targetValue) > 0.5f)
-        {
-            if (isDestroyed || progressText == null) yield break;
-
-            currentValue = Mathf.MoveTowards(
-                currentValue,
-                targetValue,
-                numberSpeed * Time.deltaTime
-            );
-
-            displayedValue = Mathf.RoundToInt(currentValue); // ✅ FIX
-
-            progressText.text = displayedValue + "/" + required;
-
-            yield return null;
-        }
-
+    // 🔥 SAFETY RESET (critical)
+    if (displayedValue > targetValue)
         displayedValue = targetValue;
-        progressText.text = targetValue + "/" + required;
+
+    while (displayedValue != targetValue)
+    {
+        if (isDestroyed || progressText == null) yield break;
+
+        displayedValue = (int)Mathf.MoveTowards(
+    displayedValue,
+    targetValue,
+    Time.deltaTime * numberSpeed * 100f
+);
+
+        progressText.text = displayedValue + "/" + required;
+
+        yield return null;
     }
+
+    displayedValue = targetValue;
+    progressText.text = targetValue + "/" + required;
+}
 
     IEnumerator SmoothLevel(int targetLevel)
     {
@@ -163,4 +163,26 @@ public class NexusProgressUI : MonoBehaviour
         displayedLevel = targetLevel;
         levelText.text = "" + targetLevel;
     }
+
+   public void ForceResetUI(int current, int required, int level)
+{
+    // 🔥 STOP ALL animations FIRST
+    if (fillRoutine != null) StopCoroutine(fillRoutine);
+    if (numberRoutine != null) StopCoroutine(numberRoutine);
+    if (levelRoutine != null) StopCoroutine(levelRoutine);
+
+    // 🔥 RESET INTERNAL STATE (VERY IMPORTANT)
+    displayedValue = current;
+    displayedLevel = level;
+
+    // 🔥 FORCE UI VALUES
+    if (fillImage != null)
+        fillImage.fillAmount = 0f;
+
+    if (progressText != null)
+        progressText.text = current + "/" + required;
+
+    if (levelText != null)
+        levelText.text = "" + level;
+}
 }
