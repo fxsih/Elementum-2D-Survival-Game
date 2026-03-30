@@ -3,17 +3,17 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer))]
 public class YSort : MonoBehaviour
 {
-    public PlayerController player;        // assign ONLY on player
-    public SpriteRenderer baseRenderer;     // used for tree tops
+    public PlayerController player;      // Assign ONLY on player
+    public SpriteRenderer baseRenderer;  // Used for tree tops
 
     // ➕ NEW: player base reference (for dash FX)
-    public Transform playerBase;            // assign GroundRef here
+    public Transform playerBase;         // Assign GroundRef here
 
     public int offset = 0;
 
-    SpriteRenderer sr;
-    int lockedOrder;
-    bool wasJumping;
+    private SpriteRenderer sr;
+    private int lockedOrder;
+    private bool wasJumping;
 
     void Awake()
     {
@@ -42,7 +42,7 @@ public class YSort : MonoBehaviour
         {
             if (player.IsJumping && !wasJumping)
             {
-                // lock CURRENT correct order
+                // Lock CURRENT correct order
                 lockedOrder = Mathf.RoundToInt(-transform.position.y * 100f) + offset;
             }
 

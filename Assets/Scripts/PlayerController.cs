@@ -889,12 +889,9 @@ void Die()
 
 void HandleDeathEnd()
 {
-    // For now just log
-    Destroy(gameObject);
+    GameOverManager.Instance.GameOver();
 
-    // Later:
-    // restart scene
-    // show UI
+    gameObject.SetActive(false); // instead of Destroy
 }
 IEnumerator HideShadowDelayed()
 {

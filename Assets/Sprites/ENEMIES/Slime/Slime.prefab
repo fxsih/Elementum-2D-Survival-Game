@@ -311,6 +311,9 @@ MonoBehaviour:
   hitStopDuration: 0.05
   damagePopupPrefab: {fileID: 8100303338326011014, guid: 78915488ec1cc85498d475af91a56533,
     type: 3}
+  gemPrefab: {fileID: 1096413890350911899, guid: af04a192e37446c4cbc8453c03d6b063,
+    type: 3}
+  gemAmount: 1
 --- !u!114 &1019349089072719273
 MonoBehaviour:
   m_ObjectHideFlags: 0

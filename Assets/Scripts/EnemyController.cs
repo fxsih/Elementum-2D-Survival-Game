@@ -17,6 +17,11 @@ public class EnemyController : MonoBehaviour
     Rigidbody2D rb;
     Animator animator;
 
+    [Header("Loot")]
+public GameObject gemPrefab;
+public int gemAmount = 1;
+
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -84,6 +89,7 @@ void Die()
 
     animator.ResetTrigger("Hurt");
     animator.SetTrigger("Die");
+    GameManager.Instance.AddKill();
 
     // 🔥 STOP PATHFINDING
     AIPath ai = GetComponent<AIPath>();
@@ -101,6 +107,7 @@ void Die()
     GetComponent<Collider2D>().enabled = false;
 
     // destroy after animation
+    DropGems();
     Destroy(gameObject, 1.5f);
 }
 
@@ -119,6 +126,29 @@ void Die()
     {
         Vector2 dir = (player.transform.position - transform.position).normalized;
 player.TakeDamage(10f, dir);
+    }
+}
+
+void DropGems()
+{
+    for (int i = 0; i < gemAmount; i++)
+    {
+        Vector2 offset = Random.insideUnitCircle * 0.2f;
+
+        GameObject gem = Instantiate(
+            gemPrefab,
+            transform.position + (Vector3)offset,
+            Quaternion.identity
+        );
+
+        // each gem = 1 value
+        GemPickup pickup = gem.GetComponent<GemPickup>();
+        if (pickup != null)
+        {
+            pickup.amount = 1;
+        }
+
+        pickup.StartBounce();
     }
 }
 }
