@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5fb8edc82f0316741adc26bbffc2421c, type: 3}
-  m_Name: SPEED
+  m_Name: SL LV 2
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeData
-  upgradeName: SPEED
-  description: increases running speed by 5%
-  icon: {fileID: 21300000, guid: 1e21adc6fc4b6bd43969509948d94278, type: 3}
+  upgradeName: RAZOR STRIKE
+  description: Slash Damage +10
+  icon: {fileID: 21300000, guid: 88e738bb53deff74e940096b719f282e, type: 3}
   type: 1
-  value: 2
+  value: 10

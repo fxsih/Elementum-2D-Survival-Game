@@ -2,11 +2,20 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Collider2D))]
 public class PlayerController : MonoBehaviour
 {
+
+    [Header("Upgrade Limits")]
+public float maxMoveSpeed = 8f;
+public float maxSlashSpeed = 0.6f;
+public float maxFireballSpeed = 0.8f;
+
+public float maxDashDuration = 0.45f;
+
     [Header("Movement")]
     public float moveSpeed = 6f;
 
@@ -16,7 +25,7 @@ float currentHealth;
 bool isDead = false;
 
 [Header("Hurt Settings")]
-public float knockbackForce = 8f;
+public float knockbackForce = 3f;
 public float knockbackDuration = 0.2f;
 
 public HealthBarUI healthUI;
@@ -38,9 +47,8 @@ public bool IsDead => isDead;
     public float dashCooldown = 0.5f;
 
     [Header("Dash Damage")]
-public float dashDamage = 4f;
-public float dashRadius = 0.6f;
 public LayerMask dashHitLayers;
+public float dashRadius = 0.6f;
 // 🔥 DASH OPTIMIZATION
 Collider2D[] dashHitsBuffer = new Collider2D[50];
 float dashDamageInterval = 0.05f;
@@ -74,7 +82,6 @@ public Vector3 attack1VfxScale = Vector3.one;
 public float attack1Radius = 0.8f;
 public float attack1Force = 6f;
 public LayerMask attack1AffectLayers;
-public float attack1Damage = 5f;
 bool attack1Held;
 
 
@@ -108,15 +115,63 @@ bool attack2Held;
     public Vector2 runDustOffsetRight = Vector2.zero;
     public Vector2 runDustOffsetLeft = new Vector2(-0.5f, 0f);
 
-    [Header("Upgrade Stats")]
-public float damage = 0f;        // bonus damage
-public float attackSpeed = 1f;   // multiplier (1 = normal)
+    [Header("Life steal")]
+    public bool hasLifeSteal = false;
+    public float lifeStealAmount = 0f;
+
+    [Header("Gem Multiplier")]
+    public bool hasGemMultiplier = false;
+    public float gemMultiplier = 1f;
+
+[Header("Base Stats")]
+
+// Attack 1 (Slash)
+public float baseSlashDamage = 5f;
+public float baseSlashSpeed = 1f;
+
+
+// Attack 2 (Fireball)
+public float baseFireballDamage = 8f;
+public float baseFireballSpeed = 1f;
+
+// Dash
+public float baseDashDamage = 4f;
+public float baseDashDuration = 0.18f;
+
+
+[Header("Upgrade Bonuses")]
+
+// Attack 1
+float bonusSlashDamage = 0f;
+float bonusSlashSpeed = 0f;
+
+// Attack 2
+float bonusFireballDamage = 0f;
+float bonusFireballSpeed = 0f;
+
+
+// Dash
+float bonusDashDamage = 0f;
+float bonusDashDuration = 0f;
+
+
+// Utility (these can stay direct)
+public float baseLifeSteal = 2f; // heal per kill
+public bool hasAura = false;
+
+public float auraDamage = 1f;     // damage per tick
+public float auraRadius = 1.5f;   // range
+public float auraTickRate = 1f;   // per second
+float auraTimer = 0f;
 
     Rigidbody2D rb;
     Collider2D playerCollider;
     SpriteRenderer sprite;
     Animator animator;
 
+    public static PlayerController Instance;
+
+    bool lastUsedSlash = true;
     Transform visual;
     Transform shadow;
 
@@ -159,8 +214,17 @@ public bool IsAttacking => isAttacking;
     public bool IsJumping => isJumping;
     public bool IsDashing => isDashing;
 
+    Dictionary<EnemyController, float> enemyHitCooldown = new Dictionary<EnemyController, float>();
+public float enemyDamageCooldown = 0.5f;
+
+public TMP_Text healthText; // drag in inspector
+
     void Awake()
     {
+        if (Instance == null)
+        Instance = this;
+    else
+        Destroy(gameObject);
         rb = GetComponent<Rigidbody2D>();
         playerCollider = GetComponent<Collider2D>();
         animator = GetComponentInChildren<Animator>();
@@ -175,6 +239,7 @@ public bool IsAttacking => isAttacking;
         playerLayer = LayerMask.NameToLayer("Player");
         enemyLayer = LayerMask.NameToLayer("Enemy");
         currentHealth = maxHealth;
+        UpdateHealthUI();
     }
 
     void OnEnable()
@@ -187,13 +252,28 @@ public bool IsAttacking => isAttacking;
 
         input.Gameplay.MousePosition.performed += ctx => mouseScreenPos = ctx.ReadValue<Vector2>();
 
-        input.Gameplay.Jump.performed += _ => QueueJump();
+        input.Gameplay.Jump.performed += _ =>
+{
+    QueueJump();
+};
         input.Gameplay.Dash.performed += _ => TryStartDash();
 
-       input.Gameplay.Attack1.performed += _ => attack1Held = true;
+       input.Gameplay.Attack1.performed += _ =>
+{
+    if (isDashing)
+        EndDash(); // 🔥 cancel dash
+
+    attack1Held = true;
+};
 input.Gameplay.Attack1.canceled += _ => attack1Held = false;
 
-input.Gameplay.Attack2.performed += _ => attack2Held = true;
+input.Gameplay.Attack2.performed += _ =>
+{
+    if (isDashing)
+        EndDash(); // 🔥 cancel dash
+
+    attack2Held = true;
+};
 input.Gameplay.Attack2.canceled += _ => attack2Held = false;
     }
 
@@ -203,38 +283,75 @@ input.Gameplay.Attack2.canceled += _ => attack2Held = false;
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
     }
 
-    void FixedUpdate()
+  void FixedUpdate()
+{
+    // 🔥 KNOCKBACK
+    if (knockbackTimer > 0f)
     {
-        if (knockbackTimer > 0f)
-{
-    rb.linearVelocity = knockbackDirection * knockbackForce;
-    return;
-}
-        if (isDashing)
-        {
-            rb.linearVelocity = dashDirection * dashSpeed;
-        }
-        else if (isJumping)
-        {
-            Vector2 airMove = moveInput * moveSpeed * airControl;
+        Vector2 move = knockbackDirection * knockbackForce * Time.fixedDeltaTime;
 
-            rb.linearVelocity = Vector2.Lerp(
-                rb.linearVelocity,
-                dashJumpMomentum + airMove,
-                0.2f
-            );
-        }
-        else
+        RaycastHit2D hit = Physics2D.Raycast(
+            rb.position,
+            knockbackDirection,
+            move.magnitude,
+            LayerMask.GetMask("Wall")
+        );
+
+        if (!hit)
         {
-            rb.linearVelocity = moveInput * moveSpeed;
+            rb.MovePosition(rb.position + move);
         }
 
-        if (isAttacking && lockMovementDuringAttack)
-{
-    rb.linearVelocity = Vector2.zero;
-    return;
-}
+        return;
     }
+
+    // 🔥 DASH (FULLY CONTROLLED HERE)
+    if (isDashing)
+    {
+        dashTimer += Time.fixedDeltaTime;
+        dashDamageTimer -= Time.fixedDeltaTime;
+
+        if (dashDamageTimer <= 0f)
+        {
+            DealDashDamage();
+            dashDamageTimer = dashDamageInterval;
+        }
+
+        float finalDashDuration = Mathf.Min(baseDashDuration + bonusDashDuration, 0.45f);
+
+        if (dashTimer >= finalDashDuration)
+        {
+            EndDash();
+            return;
+        }
+
+        rb.linearVelocity = dashDirection * dashSpeed;
+        return; // 🔥 BLOCK EVERYTHING ELSE
+    }
+
+    // 🔥 NORMAL MOVEMENT
+    if (isJumping)
+    {
+        Vector2 airMove = moveInput * moveSpeed * airControl;
+
+        rb.linearVelocity = Vector2.Lerp(
+            rb.linearVelocity,
+            dashJumpMomentum + airMove,
+            0.2f
+        );
+    }
+    else
+    {
+        rb.linearVelocity = moveInput * GetMoveSpeed();
+    }
+
+    // 🔥 ATTACK LOCK
+    if (isAttacking && lockMovementDuringAttack)
+    {
+        rb.linearVelocity = Vector2.zero;
+        return;
+    }
+}
 
     void Update()
     {
@@ -244,8 +361,26 @@ input.Gameplay.Attack2.canceled += _ => attack2Held = false;
             if (jumpBufferTimer <= 0f)
                 jumpQueued = false;
         }
-        if (attackCooldownTimer > 0f)
-    attackCooldownTimer -= Time.deltaTime * attackSpeed;
+         if (attackCooldownTimer > 0f)
+{
+    float slashSpeed = Mathf.Min(baseSlashSpeed + bonusSlashSpeed, 0.6f);
+    float fireballSpeed = Mathf.Min(baseFireballSpeed + bonusFireballSpeed, 0.8f);
+
+    slashSpeed = Mathf.Min(slashSpeed, 3f);
+    fireballSpeed = Mathf.Min(fireballSpeed, 3f);
+
+    // 🔥 IGNORE INPUT WHILE DASHING
+    if (isDashing)
+    {
+        attackCooldownTimer -= Time.deltaTime;
+        return;
+    }
+
+    if (lastUsedSlash)
+        attackCooldownTimer -= Time.deltaTime * GetFinalSlashSpeed();
+    else
+        attackCooldownTimer -= Time.deltaTime * GetFinalFireballSpeed();
+}
         if (invulnTimer > 0f)
             {
                 invulnTimer -= Time.deltaTime;
@@ -261,21 +396,21 @@ input.Gameplay.Attack2.canceled += _ => attack2Held = false;
 {
     knockbackTimer -= Time.deltaTime;
 
-    if (knockbackTimer <= 0f)
-    {
-        // 🔥 RESTORE COLLISION
-        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
-    }
+   if (knockbackTimer <= 0f)
+{
+    Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
+    rb.linearVelocity = Vector2.zero; // ✅ ADD THIS
+}
 }
         UpdateFacing();
         UpdateAnimation();
         UpdateJump();
         UpdateShadowOffset();
         UpdateRunDust();
-        UpdateDash();
         UpdateDashCooldown();
         UpdateAttack();
         HandleAttackHold();
+        HandleAuraDamage();
     }
 
     void TryStartDash()
@@ -313,37 +448,18 @@ input.Gameplay.Attack2.canceled += _ => attack2Held = false;
         SpawnDashFX();
     }
 
-    void UpdateDash()
-{
-    if (!isDashing) return;
-
-    dashTimer += Time.deltaTime;
-    dashDamageTimer -= Time.deltaTime;
-
-if (dashDamageTimer <= 0f)
-{
-    DealDashDamage();
-    dashDamageTimer = dashDamageInterval;
-}
-    if (dashTimer >= dashDuration)
-    {
-        EndDash();
-    }
-}
 
 void EndDash()
 {
     isDashing = false;
 
-    // 🔥 RESTORE COLLISION
+    // 🔥 HARD STOP
+    rb.linearVelocity = Vector2.zero;
+
     if (playerLayer != -1 && enemyLayer != -1)
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
 
-    // 🔥 RESTORE VISUAL
     visual.gameObject.SetActive(true);
-
-    if (!isJumping)
-        rb.linearVelocity = Vector2.zero;
 
     dashLocked = true;
     dashLockTimer = 0f;
@@ -354,7 +470,6 @@ void EndDash()
         StartJump();
     }
 }
-
     void UpdateDashCooldown()
     {
         if (!dashLocked) return;
@@ -381,7 +496,8 @@ void EndDash()
 
         StartCoroutine(UpdateFxSorting(fx));
 
-        Destroy(fx, dashDuration);
+        float finalDashDuration = Mathf.Min(baseDashDuration + bonusDashDuration, 0.45f);
+Destroy(fx, finalDashDuration);
     }
 
     IEnumerator UpdateFxSorting(GameObject fx)
@@ -569,6 +685,7 @@ void TryAttack2()
 
 void StartAttack1()
 {
+    lastUsedSlash = true;
     isAttacking = true;
     attackTimer = attack1Duration;
     attackCooldownTimer = attack1Delay;
@@ -577,6 +694,7 @@ void StartAttack1()
 
 void StartAttack2()
 {
+    lastUsedSlash = false;
     isAttacking = true;
     attackTimer = attack2Duration;
     attackCooldownTimer = attack2Delay;
@@ -586,7 +704,16 @@ void UpdateAttack()
 {
     if (!isAttacking) return;
 
-    attackTimer -= Time.deltaTime * attackSpeed;
+    float slashSpeed = baseSlashSpeed + bonusSlashSpeed;
+float fireballSpeed = baseFireballSpeed + bonusFireballSpeed;
+
+// Decide which attack is active
+if (attack1Held)
+    attackCooldownTimer -= Time.deltaTime * slashSpeed;
+else if (attack2Held)
+    attackCooldownTimer -= Time.deltaTime * fireballSpeed;
+else
+    attackCooldownTimer -= Time.deltaTime;
 
     if (attackTimer <= 0f)
     {
@@ -634,7 +761,7 @@ if (e != null && e.IsDead) continue;
     // 🔥 CLOSE RANGE ALWAYS HIT
     if (distance < minDistanceAlwaysHit)
     {
-        enemy.TakeDamage(attack1Damage + damage);
+       enemy.TakeDamage(baseSlashDamage + bonusSlashDamage);
 
         Vector2 pushDir = (toTarget + dir).normalized;
         hitRb.AddForce(pushDir * attack1Force, ForceMode2D.Impulse);
@@ -646,7 +773,7 @@ if (e != null && e.IsDead) continue;
 
     if (hitAngle <= attackAngle * 0.5f)
     {
-        enemy.TakeDamage(attack1Damage + damage); // ✅ MOVED HERE
+       enemy.TakeDamage(baseSlashDamage + bonusSlashDamage);// ✅ MOVED HERE
 
         Vector2 pushDir = (toTarget + dir * 0.5f).normalized;
         hitRb.AddForce(pushDir * attack1Force, ForceMode2D.Impulse);
@@ -731,7 +858,7 @@ if (projectileCol != null && playerCollider != null)
     {
         projectile.speed = attack2ProjectileSpeed;
         projectile.SetDirection(dir);
-projectile.SetDamage(damage); // 🔥 THIS LINE FIXES IT
+projectile.SetDamage(baseFireballDamage + bonusFireballDamage);// 🔥 THIS LINE FIXES IT
     }
 }
 Vector2 GetMouseDirection()
@@ -794,6 +921,7 @@ else
 }
 void HandleAttackHold()
 {
+    if (isDashing) return;
     if (attack2Held)
     {
         TryAttack2();
@@ -826,7 +954,7 @@ void DealDashDamage()
         if (enemy.IsDead) continue;
         if (hitEnemies.Contains(enemy)) continue;
 
-       enemy.TakeDamage(dashDamage + damage, false);
+       enemy.TakeDamage(baseDashDamage + bonusDashDamage, false);
         Rigidbody2D enemyRb = enemy.GetComponent<Rigidbody2D>();
 if (enemyRb != null)
 {
@@ -838,33 +966,46 @@ if (enemyRb != null)
     }
 }
 
-public void TakeDamage(float damage, Vector2 hitDirection)
+public void TakeDamage(float damage, Vector2 hitDirection)  
+{  
+    if (isDead) return;  
+    if (invulnTimer > 0f) return;  
+
+    currentHealth -= damage;  
+
+    UpdateHealthUI(); // ✅ UPDATED
+
+    invulnTimer = invulnTime;  
+
+    knockbackDirection = hitDirection.normalized;  
+    knockbackTimer = knockbackDuration;  
+
+    Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);  
+
+    if (animator != null)  
+        animator.SetTrigger("Hurt");  
+
+    HitStop.Instance?.DoHitStop(0.03f);  
+
+    if (currentHealth <= 0f)  
+    {  
+        Die();  
+    }  
+}
+
+public void TryTakeDamageFromEnemy(EnemyController enemy, float damage, Vector2 hitDir)
 {
     if (isDead) return;
-    if (invulnTimer > 0f) return;
-    
-    currentHealth -= damage;
-    if (healthUI != null)
-    healthUI.UpdateHealth(currentHealth, maxHealth);
 
-    invulnTimer = invulnTime;
-
-    // 🔥 CALCULATE KNOCKBACK DIRECTION
-    knockbackDirection = hitDirection.normalized;
-    knockbackTimer = knockbackDuration;
-
-    // 🔥 PASS THROUGH ENEMIES
-    Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);
-
-    if (animator != null)
-        animator.SetTrigger("Hurt");
-
-    HitStop.Instance?.DoHitStop(0.03f);
-
-    if (currentHealth <= 0f)
+    if (enemyHitCooldown.ContainsKey(enemy))
     {
-        Die();
+        if (Time.time < enemyHitCooldown[enemy])
+            return;
     }
+
+    enemyHitCooldown[enemy] = Time.time + enemyDamageCooldown;
+
+    TakeDamage(damage, hitDir);
 }
 void Die()
 {
@@ -918,46 +1059,129 @@ public float GetMaxHealth()
     return maxHealth;
 }
 
-public void Heal(float amount)
-{
-    if (isDead) return;
+public void Heal(float amount)  
+{  
+    if (isDead) return;  
 
-    currentHealth += amount;
-currentHealth = Mathf.Min(currentHealth, maxHealth);
+    currentHealth += amount;  
+    currentHealth = Mathf.Min(currentHealth, maxHealth);  
 
-if (healthUI != null)
-    healthUI.UpdateHealth(currentHealth, maxHealth);
+    UpdateHealthUI(); // ✅ UPDATED
 }
-
 public void ApplyUpgrade(UpgradeData upgrade)
 {
     switch (upgrade.type)
     {
         case UpgradeType.Speed:
             moveSpeed += upgrade.value;
+            moveSpeed = Mathf.Min(moveSpeed, maxMoveSpeed);
             break;
 
-        case UpgradeType.Damage:
-            damage += upgrade.value;
+        case UpgradeType.SlashDamage:
+            bonusSlashDamage += upgrade.value;
             break;
 
-        case UpgradeType.AttackSpeed:
-            attackSpeed += upgrade.value;
+        case UpgradeType.FireballDamage:
+            bonusFireballDamage += upgrade.value;
+            break;
+
+        case UpgradeType.DashDamage:
+            bonusDashDamage += upgrade.value;
+            break;
+
+        case UpgradeType.DashDuration:
+            bonusDashDuration += upgrade.value;
             break;
 
         case UpgradeType.Health:
-    maxHealth += upgrade.value;
-    currentHealth = Mathf.Min(currentHealth + upgrade.value, maxHealth);
+            maxHealth += upgrade.value;
+            currentHealth = Mathf.Min(currentHealth + upgrade.value, maxHealth);
+            UpdateHealthUI(); // ✅ ADD THIS
+            break;
 
-    if (healthUI != null)
-    {
-        healthUI.UpdateBarSize(maxHealth); // ⭐ THIS IS STEP 3
-        healthUI.UpdateHealth(currentHealth, maxHealth);
-    }
-
+        case UpgradeType.LifeSteal:
+    hasLifeSteal = true;
+    lifeStealAmount = baseLifeSteal;
     break;
+
+       case UpgradeType.GemMultiplier:
+    hasGemMultiplier = true;
+    gemMultiplier = 2f;
+    break;
+
+        case UpgradeType.AuraDamage:
+            auraDamage += upgrade.value;
+            break;
+
+        case UpgradeType.SlashSpeed:
+            bonusSlashSpeed += upgrade.value;
+            break;
+
+        case UpgradeType.FireballSpeed:
+            bonusFireballSpeed += upgrade.value;
+            break;
     }
 
     Debug.Log("Upgrade Applied: " + upgrade.upgradeName);
+}
+
+void UpdateHealthUI()
+{
+    if (healthUI != null)
+        healthUI.UpdateHealth(currentHealth, maxHealth);
+
+    if (healthText != null)
+        healthText.text = Mathf.CeilToInt(currentHealth) + "/" + Mathf.CeilToInt(maxHealth);
+}
+public void OnEnemyKilled(float enemyMaxHealth)
+{
+    if (hasLifeSteal) return;
+
+    float healAmount = enemyMaxHealth * lifeStealAmount;
+
+    Heal(healAmount);
+}
+
+void HandleAuraDamage()
+{
+    if (!hasAura) return;
+
+    auraTimer += Time.deltaTime;
+
+    if (auraTimer < auraTickRate) return; // 🔥 use your variable
+
+    auraTimer = 0f;
+
+    Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, auraRadius);
+
+    foreach (Collider2D hit in hits)
+    {
+        EnemyController enemy = hit.GetComponent<EnemyController>();
+
+        if (enemy != null && !enemy.IsDead)
+        {
+            enemy.TakeDamage(auraDamage, false); // ❌ no hitstop
+        }
+    }
+}
+
+public float GetFinalSlashSpeed()
+{
+    return Mathf.Min(baseSlashSpeed + bonusSlashSpeed, maxSlashSpeed);
+}
+
+public float GetFinalFireballSpeed()
+{
+    return Mathf.Min(baseFireballSpeed + bonusFireballSpeed, maxFireballSpeed);
+}
+
+public float GetFinalDashDuration()
+{
+    return Mathf.Min(baseDashDuration + bonusDashDuration, maxDashDuration);
+}
+
+public float GetMoveSpeed()
+{
+    return Mathf.Min(moveSpeed, maxMoveSpeed);
 }
 }

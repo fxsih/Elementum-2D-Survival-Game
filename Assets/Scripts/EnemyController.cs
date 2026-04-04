@@ -11,11 +11,16 @@ public class EnemyController : MonoBehaviour
     public float hitStopDuration = 0.05f;
     public GameObject damagePopupPrefab;
 
+    [Header("Combat")]
+public float contactDamage = 10f;
+
     float currentHealth;
 
     Transform player;
     Rigidbody2D rb;
     Animator animator;
+
+    int lastHitFrame = -1;
 
     [Header("Loot")]
 public GameObject gemPrefab;
@@ -51,33 +56,44 @@ public int gemAmount = 1;
         animator.SetBool("IsMoving", dir.sqrMagnitude > 0.01f);
 }
 
-  public void TakeDamage(float damage, bool applyHitstop = true)
+public void TakeDamage(float damage, bool applyHitstop = true)
 {
     if (isDead) return;
-if (applyHitstop)
-{
-    HitStop.Instance?.DoHitStop(hitStopDuration);
-}
+
+    // 🔥 BLOCK SAME FRAME MULTI HIT
+    if (lastHitFrame == Time.frameCount)
+        return;
+
+    lastHitFrame = Time.frameCount;
+
+    // ✅ ONLY apply hitstop when explicitly allowed
+    if (applyHitstop)
+    {
+        HitStop.Instance?.DoHitStop(hitStopDuration);
+    }
+
     currentHealth -= damage;
+
+    // 🔥 DAMAGE POPUP
     if (damagePopupPrefab != null)
-{
-   Vector3 spawnPos = transform.position + new Vector3(0, 1f, 0); // slightly above enemy
-spawnPos.z = 0; // force visible layer
+    {
+        Vector3 spawnPos = transform.position + new Vector3(0, 1f, 0);
+        spawnPos.z = 0;
 
-GameObject popup = Instantiate(damagePopupPrefab, spawnPos, Quaternion.identity);
+        GameObject popup = Instantiate(damagePopupPrefab, spawnPos, Quaternion.identity);
+        popup.GetComponent<DamagePopup>().Setup((int)damage);
+    }
 
-    popup.GetComponent<DamagePopup>().Setup((int)damage);
-}
-
+    // 🔥 DEATH
     if (currentHealth <= 0f)
     {
         Die();
-        return; // 🔥 VERY IMPORTANT
+        return;
     }
 
+    // 🔥 HURT ANIMATION (optional: disable for dash if you want)
     if (animator != null)
         animator.SetTrigger("Hurt");
-        
 }
 
 void Die()
@@ -90,6 +106,18 @@ void Die()
     animator.ResetTrigger("Hurt");
     animator.SetTrigger("Die");
     GameManager.Instance.AddKill();
+
+   PlayerController player = FindObjectOfType<PlayerController>();
+
+   if (player.hasLifeSteal)
+{
+    player.Heal(player.lifeStealAmount);
+}
+
+if (player != null)
+{
+    player.OnEnemyKilled(maxHealth);
+}
 
     // 🔥 STOP PATHFINDING
     AIPath ai = GetComponent<AIPath>();
@@ -116,22 +144,32 @@ void Die()
         return player != null ? (Vector2)player.position : rb.position;
     }
 
-    void OnCollisionEnter2D(Collision2D collision)
+void OnTriggerStay2D(Collider2D other)
 {
     if (isDead) return;
 
-    PlayerController player = collision.gameObject.GetComponent<PlayerController>();
+    PlayerController player = other.GetComponent<PlayerController>();
 
-    if (player != null && !player.IsDead)
+    if (player != null)
     {
-        Vector2 dir = (player.transform.position - transform.position).normalized;
-player.TakeDamage(10f, dir);
+        Vector2 direction = (player.transform.position - transform.position).normalized;
+        player.TryTakeDamageFromEnemy(this, contactDamage, direction);
     }
 }
 
 void DropGems()
 {
-    for (int i = 0; i < gemAmount; i++)
+    PlayerController player = PlayerController.Instance;
+
+    int totalGems = gemAmount;
+
+    // 🔥 multiply number of gems instead of value
+    if (player != null && player.hasGemMultiplier)
+    {
+        totalGems = Mathf.RoundToInt(gemAmount * player.gemMultiplier);
+    }
+
+    for (int i = 0; i < totalGems; i++)
     {
         Vector2 offset = Random.insideUnitCircle * 0.2f;
 
@@ -141,14 +179,13 @@ void DropGems()
             Quaternion.identity
         );
 
-        // each gem = 1 value
         GemPickup pickup = gem.GetComponent<GemPickup>();
+
         if (pickup != null)
         {
-            pickup.amount = 1;
+            pickup.amount = 1; // each gem still 1
+            pickup.StartBounce();
         }
-
-        pickup.StartBounce();
     }
 }
 }

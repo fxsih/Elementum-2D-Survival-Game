@@ -12,8 +12,26 @@ public class UpgradeData : ScriptableObject
 
 public enum UpgradeType
 {
-    Damage,
+    // Movement
     Speed,
-    AttackSpeed,
-    Health
+
+    // Attack 1 (Slash)
+    SlashDamage,
+
+    SlashSpeed,
+
+    // Attack 2 (Fireball)
+    FireballDamage,
+
+    FireballSpeed,
+
+    // Dash
+    DashDamage,
+    DashDuration,
+
+    // Utility
+    Health,
+    LifeSteal,
+    GemMultiplier,
+    AuraDamage
 }

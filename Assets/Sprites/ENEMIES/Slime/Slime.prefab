@@ -20,6 +20,7 @@ GameObject:
   - component: {fileID: 1019349089072719273}
   - component: {fileID: 578457610467406562}
   - component: {fileID: 6927626384179711934}
+  - component: {fileID: -340277611988192026}
   m_Layer: 13
   m_Name: Slime
   m_TagString: Enemy
@@ -268,7 +269,7 @@ MonoBehaviour:
   radius: 1
   height: 2
   canMove: 1
-  maxSpeed: 4
+  maxSpeed: 3.5
   gravity: {x: NaN, y: NaN, z: NaN}
   groundMask:
     serializedVersion: 2
@@ -311,6 +312,7 @@ MonoBehaviour:
   hitStopDuration: 0.05
   damagePopupPrefab: {fileID: 8100303338326011014, guid: 78915488ec1cc85498d475af91a56533,
     type: 3}
+  contactDamage: 10
   gemPrefab: {fileID: 1096413890350911899, guid: af04a192e37446c4cbc8453c03d6b063,
     type: 3}
   gemAmount: 1
@@ -369,3 +371,39 @@ MonoBehaviour:
   ignoreUnstuckDistance: 1
   orbitDistance: 1.5
   orbitSpeed: 2
+--- !u!58 &-340277611988192026
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3391622351221839926}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: -0.013135926, y: -0.20579971}
+  m_Radius: 0.4841384

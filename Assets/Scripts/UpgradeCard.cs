@@ -4,7 +4,7 @@ using TMPro;
 
 public class UpgradeCard : MonoBehaviour
 {
-    public Image iconImage; // ⭐ ADD THIS
+    public Image iconImage;
     public TextMeshProUGUI titleText;
     public TextMeshProUGUI descriptionText;
 
@@ -20,11 +20,8 @@ public class UpgradeCard : MonoBehaviour
             return;
         }
 
-        // ✅ SET ICON (THIS WAS MISSING)
         if (iconImage != null && upgrade.icon != null)
-        {
             iconImage.sprite = upgrade.icon;
-        }
 
         if (titleText != null)
             titleText.text = upgrade.upgradeName;
@@ -33,14 +30,15 @@ public class UpgradeCard : MonoBehaviour
             descriptionText.text = upgrade.description;
     }
 
+    // 🔥 REQUIRED (fixes your error)
+    public UpgradeData GetUpgrade()
+    {
+        return upgrade;
+    }
+
+    // 🔥 Button click
     public void OnClick()
     {
-        if (upgrade == null)
-        {
-            Debug.LogError("❌ Clicked upgrade is NULL");
-            return;
-        }
-
         UpgradeManager.Instance.SelectUpgrade(upgrade);
     }
 }

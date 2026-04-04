@@ -4,15 +4,19 @@ public class Attack2Projectile : MonoBehaviour
 {
     public float speed = 8f;
     public float lifeTime = 2f;
+
     public GameObject explosionPrefab;
+
     public float explosionRadius = 1.5f;
-public float explosionForce = 6f;
-public LayerMask explosionAffectLayers;
-public float attack2Damage = 8f;
-float bonusDamage;
+    public float explosionForce = 6f;
+    public LayerMask explosionAffectLayers;
+
     Rigidbody2D rb;
+
     Vector2 direction;
     bool hasHit;
+
+    float damage; // ✅ ONLY damage variable (clean)
 
     void Awake()
     {
@@ -24,10 +28,11 @@ float bonusDamage;
         Destroy(gameObject, lifeTime);
     }
 
-    public void SetDamage(float extraDamage)
-{
-    bonusDamage = extraDamage;
-}
+    // ✅ SET DAMAGE FROM PLAYER
+    public void SetDamage(float dmg)
+    {
+        damage = dmg;
+    }
 
     public void SetDirection(Vector2 dir)
     {
@@ -58,50 +63,60 @@ float bonusDamage;
     }
 
     void Hit()
-{
-    hasHit = true;
-
-    if (rb != null)
-        rb.linearVelocity = Vector2.zero;
-
-    ApplyExplosionForce();
-
-    if (explosionPrefab != null)
-        Instantiate(explosionPrefab, transform.position, Quaternion.identity);
-
-    Destroy(gameObject);
-    Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
-
-foreach (Collider2D hit in hits)
-{
-    EnemyController enemy = hit.GetComponent<EnemyController>();
-    if (enemy != null)
     {
-       enemy.TakeDamage(attack2Damage + bonusDamage);
+        hasHit = true;
+
+        if (rb != null)
+            rb.linearVelocity = Vector2.zero;
+
+        ApplyExplosionForce();
+
+        if (explosionPrefab != null)
+            Instantiate(explosionPrefab, transform.position, Quaternion.identity);
+
+        // ✅ DAMAGE
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
+
+        foreach (Collider2D hit in hits)
+        {
+            EnemyController enemy = hit.GetComponent<EnemyController>();
+
+            if (enemy != null && !enemy.IsDead)
+            {
+                enemy.TakeDamage(damage);
+            }
+        }
+
+        Destroy(gameObject);
     }
-}
-}
+
     void ApplyExplosionForce()
-{
-    Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, explosionRadius, explosionAffectLayers);
-
-    foreach (Collider2D hit in hits)
     {
-        Rigidbody2D hitRb = hit.attachedRigidbody;
-        EnemyController enemy = hit.GetComponent<EnemyController>();
-if (enemy != null && enemy.IsDead) continue;
-        if (hitRb == null) continue;
+        Collider2D[] hits = Physics2D.OverlapCircleAll(
+            transform.position,
+            explosionRadius,
+            explosionAffectLayers
+        );
 
-        Vector2 dir = (hitRb.position - (Vector2)transform.position);
-        float distance = dir.magnitude;
+        foreach (Collider2D hit in hits)
+        {
+            Rigidbody2D hitRb = hit.attachedRigidbody;
+            EnemyController enemy = hit.GetComponent<EnemyController>();
 
-        if (distance < 0.01f)
-            dir = Vector2.up;
-        else
-            dir /= distance;
+            if (enemy != null && enemy.IsDead) continue;
+            if (hitRb == null) continue;
 
-        float falloff = 1f - Mathf.Clamp01(distance / explosionRadius);
-        hitRb.AddForce(dir * explosionForce * falloff, ForceMode2D.Impulse);
+            Vector2 dir = (hitRb.position - (Vector2)transform.position);
+            float distance = dir.magnitude;
+
+            if (distance < 0.01f)
+                dir = Vector2.up;
+            else
+                dir /= distance;
+
+            float falloff = 1f - Mathf.Clamp01(distance / explosionRadius);
+
+            hitRb.AddForce(dir * explosionForce * falloff, ForceMode2D.Impulse);
+        }
     }
-}
 }

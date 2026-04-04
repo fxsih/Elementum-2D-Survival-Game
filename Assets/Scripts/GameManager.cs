@@ -13,7 +13,7 @@ public class GameManager : MonoBehaviour
     public int baseRequirement = 10;
 
     int pendingGems = 0;
-bool isProcessing = false;
+    bool isProcessing = false;
 
     [Header("Level Requirements")]
     public int[] levelRequirements;
@@ -30,7 +30,7 @@ bool isProcessing = false;
 
     void OnDestroy()
     {
-        StopAllCoroutines(); // 🔥 prevent crash during scene change
+        StopAllCoroutines();
     }
 
     // ---------------- KILLS ----------------
@@ -46,72 +46,84 @@ bool isProcessing = false;
     }
 
     // ---------------- GEMS ----------------
-   public void AddGems(int amount)
-{
-    pendingGems += amount;
-
-    if (!isProcessing)
+    public void AddGems(int amount)
     {
-        StartCoroutine(ProcessDeposit());
-    }
-}
+        pendingGems += amount;
 
- IEnumerator ProcessDeposit()
-{
-    isProcessing = true;
-
-    while (pendingGems > 0)
-    {
-        int required = GetRequiredGems();
-
-        int needed = required - storedGems;
-        int toAdd = Mathf.Min(pendingGems, needed);
-
-        storedGems += toAdd;
-        pendingGems -= toAdd;
-
-        // 🔥 Animate
-        if (NexusProgressUI.Instance != null)
+        if (!isProcessing)
         {
-            yield return NexusProgressUI.Instance.AnimateStep(
-                storedGems,
-                required,
-                currentLevel
-            );
+            StartCoroutine(ProcessDeposit());
         }
+    }
 
-        // 🔥 LEVEL UP
-        if (storedGems >= required)
+    IEnumerator ProcessDeposit()
+    {
+        isProcessing = true;
+
+        while (pendingGems > 0)
         {
+            int required = GetRequiredGems();
+            int needed = required - storedGems;
+
+            int toAdd = Mathf.Min(pendingGems, needed);
+
+            storedGems += toAdd;
+            pendingGems -= toAdd;
+
+            // 🔥 Animate progress
             if (NexusProgressUI.Instance != null)
             {
-                yield return NexusProgressUI.Instance.AnimateLevelUp(currentLevel + 1);
-            }
-
-            storedGems = 0;
-            currentLevel++;
-
-            // 🔥 Update UI
-            if (NexusProgressUI.Instance != null)
-            {
-                NexusProgressUI.Instance.ForceResetUI(
+                yield return NexusProgressUI.Instance.AnimateStep(
                     storedGems,
-                    GetRequiredGems(),
+                    required,
                     currentLevel
                 );
             }
 
-            // 🔥 STOP HERE (WAIT FOR PLAYER)
-            isProcessing = false;
+            // 🔥 LEVEL UP CHECK
+            if (storedGems >= required)
+            {
+                // 🎉 Level animation
+                if (NexusProgressUI.Instance != null)
+                {
+                    yield return NexusProgressUI.Instance.AnimateLevelUp(currentLevel + 1);
+                }
 
-            UpgradeManager.Instance.ShowUpgrades();
+                // 🔥 KEEP EXTRA GEMS (CRITICAL FIX)
+                storedGems -= required;
 
-            yield break; // 🔥 CRITICAL
+                currentLevel++;
+
+                // 🔥 Update UI after level up
+                if (NexusProgressUI.Instance != null)
+                {
+                    NexusProgressUI.Instance.ForceResetUI(
+                        storedGems,
+                        GetRequiredGems(),
+                        currentLevel
+                    );
+                }
+
+                // 🔥 PAUSE processing for upgrade selection
+                isProcessing = false;
+
+                UpgradeManager.Instance.ShowUpgrades();
+
+                yield break; // wait until player selects upgrade
+            }
         }
+
+        isProcessing = false;
     }
 
-    isProcessing = false;
-}
+    // 🔥 CALL THIS AFTER PLAYER PICKS UPGRADE
+    public void ResumeProcessing()
+    {
+        if (!isProcessing && pendingGems > 0)
+        {
+            StartCoroutine(ProcessDeposit());
+        }
+    }
 
     int GetRequiredGems()
     {
