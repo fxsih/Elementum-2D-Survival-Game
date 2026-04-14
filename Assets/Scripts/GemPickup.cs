@@ -23,6 +23,11 @@ public class GemPickup : MonoBehaviour
     bool isMovingToPlayer = false;
     bool isBouncing = false; // 🔥 NEW (prevents conflict)
 
+    [SerializeField] AudioClip[] collectSounds;
+[SerializeField] float volume = 1f;
+
+int lastIndex = -1;
+
     void Start()
     {
         player = GameObject.FindGameObjectWithTag("Player").transform;
@@ -121,8 +126,32 @@ public class GemPickup : MonoBehaviour
             inv.AddGems(amount); // ✅ correct
             PlayerStatsManager.AddGems(amount); // ✅ track total gems
         }
-
+        PlayCollectSound();
         Destroy(gameObject);
     }
+}
+
+void PlayCollectSound()
+{
+    if (collectSounds == null || collectSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+    do
+    {
+        index = Random.Range(0, collectSounds.Length);
+    }
+    while (index == lastIndex && collectSounds.Length > 1);
+
+    lastIndex = index;
+
+    float pitch = Random.Range(0.95f, 1.1f);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+    float originalPitch = source.pitch;
+
+    source.pitch = pitch;
+    source.PlayOneShot(collectSounds[index], volume);
+    source.pitch = originalPitch;
 }
 }

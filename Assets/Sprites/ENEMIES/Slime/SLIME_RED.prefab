@@ -308,8 +308,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f837c06f35d5d29448cae048179d9973, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyController
+  hitSounds:
+  - {fileID: 8300000, guid: 2407030c90a9b7a4f9b16066b4a03a08, type: 3}
+  - {fileID: 8300000, guid: 501b034ef502545469368a8f1f51a074, type: 3}
+  - {fileID: 8300000, guid: a96b758e346642749a0cc0581a3bf5c2, type: 3}
+  hitVolume: 0.5
+  minPitch: 0.9
+  maxPitch: 2
   moveSpeed: 4
-  maxHealth: 50
+  maxHealth: 80
   hitStopDuration: 0.05
   damagePopupPrefab: {fileID: 8100303338326011014, guid: 78915488ec1cc85498d475af91a56533,
     type: 3}
@@ -431,3 +438,10 @@ MonoBehaviour:
     type: 3}
   flashCount: 8
   flashSpeed: 0.3
+  deathSounds:
+  - {fileID: 8300000, guid: ac47dc9f72d7ed7489af33da203398c2, type: 3}
+  - {fileID: 8300000, guid: aeb3be96b634bc949a573097c29f8ef3, type: 3}
+  - {fileID: 8300000, guid: e08e9732e12bd6f4ebc1efc45a9680b3, type: 3}
+  deathVolume: 0.5
+  deathMinPitch: 0.85
+  deathMaxPitch: 1.05

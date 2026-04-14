@@ -251,6 +251,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f837c06f35d5d29448cae048179d9973, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyController
+  hitSounds:
+  - {fileID: 8300000, guid: cac181da0c3dfa24eac2d2c6d9557aa6, type: 3}
+  - {fileID: 8300000, guid: d0528511ec2c0f145b597e93fda6fa03, type: 3}
+  hitVolume: 0.5
+  minPitch: 0.9
+  maxPitch: 2
   moveSpeed: 5
   maxHealth: 150
   hitStopDuration: 0.05
@@ -332,13 +338,15 @@ MonoBehaviour:
     type: 3}
   stopDistance: 13.4
   runDistance: 5
-  retreatDistance: 5
   shootCooldown: 2
   firePoint: {fileID: 911127267588447660}
+  projectileSounds:
+  - {fileID: 8300000, guid: 44b34ef61c364394a92b7d4f90460334, type: 3}
+  projectileVolume: 0.05
+  projectileMinPitch: 1
+  projectileMaxPitch: 9.32
   despawnDistance: 20
-  blockedLayers:
-    serializedVersion: 2
-    m_Bits: 0
+  respawnDistance: 12
 --- !u!70 &748195393131150440
 CapsuleCollider2D:
   m_ObjectHideFlags: 0
@@ -389,6 +397,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WitchCombat
   knockbackForce: 1
+  deathSounds:
+  - {fileID: 8300000, guid: 1fd4173c22bfc6d46bf4f33556a10f68, type: 3}
+  deathVolume: 0.5
+  deathMinPitch: 0.9
+  deathMaxPitch: 1.1
 --- !u!1 &4226728660551441401
 GameObject:
   m_ObjectHideFlags: 0

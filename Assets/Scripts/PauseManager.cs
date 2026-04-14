@@ -32,30 +32,38 @@ public class PauseManager : MonoBehaviour
     }
 
     public void Pause()
-    {
-        isPaused = true;
+{
+    isPaused = true;
 
-        pausePanel.SetActive(true);
-        pauseMenu.SetActive(true);
-        settingsPanel.SetActive(false);
+    pausePanel.SetActive(true);
+    pauseMenu.SetActive(true);
+    settingsPanel.SetActive(false);
 
-        Time.timeScale = 0f;
+    Time.timeScale = 0f;
 
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
-    }
+    // 🔊 PAUSE AUDIO
+    AudioManager.Instance?.PauseAllAudio();
 
-    public void Resume()
-    {
-        isPaused = false;
+    Cursor.lockState = CursorLockMode.None;
+    Cursor.visible = true;
+}
 
-        pausePanel.SetActive(false);
+   public void Resume()
+{
+    isPaused = false;
 
-        Time.timeScale = 1f;
+    pausePanel.SetActive(false);
 
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
-    }
+    Time.timeScale = 1f;
+
+    // 🔊 RESUME AUDIO
+    AudioManager.Instance?.ResumeAllAudio();
+    PlayerController.Instance?.ResetFootsteps();
+
+
+    Cursor.lockState = CursorLockMode.None;
+    Cursor.visible = true;
+}
 
     // 🔥 NEW → OPEN SETTINGS
     public void OpenSettings()
@@ -93,4 +101,6 @@ public class PauseManager : MonoBehaviour
             UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
         }
     }
+
+    
 }

@@ -28,6 +28,17 @@ public class UpgradeManager : MonoBehaviour
 
     public CanvasGroup cardCanvasGroup;
 
+    [Header("Level Up Audio")]
+public AudioClip[] levelUpSounds;
+
+[Range(0f,1f)]
+public float levelUpVolume = 1f;
+
+public float levelUpMinPitch = 0.95f;
+public float levelUpMaxPitch = 1.1f;
+
+int lastLevelUpIndex = -1;
+
     void Awake()
     {
         Instance = this;
@@ -108,6 +119,7 @@ void ActivateMouseMode()
     // =========================
     public void ShowUpgrades()
 {
+    PlayLevelUpSound();
     panel.SetActive(true);
     Time.timeScale = 0f;
 
@@ -333,5 +345,32 @@ case UpgradeType.LifeStealBoost:
         default:
             return true;
     }
+}
+
+void PlayLevelUpSound()
+{
+    if (levelUpSounds == null || levelUpSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, levelUpSounds.Length);
+    }
+    while (index == lastLevelUpIndex && levelUpSounds.Length > 1);
+
+    lastLevelUpIndex = index;
+
+    float pitch = Random.Range(levelUpMinPitch, levelUpMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(levelUpSounds[index], levelUpVolume);
+
+    source.pitch = originalPitch;
 }
 }

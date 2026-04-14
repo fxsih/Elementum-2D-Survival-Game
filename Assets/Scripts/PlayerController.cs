@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 using TMPro;
+using UnityEngine.Tilemaps;
 
 [RequireComponent(typeof(Rigidbody2D))]
 
@@ -15,6 +16,86 @@ using TMPro;
 public class PlayerController : MonoBehaviour
 
 {
+public Tilemap groundTilemap;
+
+[Header("Fireball Audio")]
+public AudioClip[] fireballSounds;
+
+[Range(0f,1f)]
+public float fireballVolume = 0.8f;
+
+public float fireballMinPitch = 0.95f;
+public float fireballMaxPitch = 1.1f;
+
+int lastFireballIndex = -1;
+
+[Header("Player Death Audio")]
+public AudioClip[] deathSounds;
+
+[Range(0f,1f)]
+public float deathVolume = 1f;
+
+[Header("Pitch Variation")]
+public float deathMinPitch = 0.9f;
+public float deathMaxPitch = 1.05f;
+
+bool hasPlayedDeathSound = false;
+int lastDeathIndex = -1;
+
+[Header("Player Hurt Audio")]
+public AudioClip[] hurtSounds;
+
+[Range(0f,1f)]
+public float hurtVolume = 0.9f;
+
+[Header("Pitch Variation")]
+public float hurtMinPitch = 0.9f;
+public float hurtMaxPitch = 1.1f;
+
+[Header("Hurt Cooldown")]
+public float hurtCooldown = 0.3f;
+
+float lastHurtTime = -1f;
+int lastHurtIndex = -1;
+
+[Header("Slash Audio")]
+public AudioClip[] slashSounds;
+
+[Range(0f,1f)] public float slashVolume = 0.8f;
+
+int lastSlashIndex = -1;
+
+[Header("Dash Audio")]
+public AudioClip[] dashSounds;
+
+[Range(0f,1f)] public float dashVolume = 0.7f;
+[Range(0.05f,0.5f)] public float dashAudioDuration = 0.2f;
+
+Coroutine dashRoutine;
+int lastDashIndex = -1;
+
+[Header("Landing Audio")]
+public AudioClip[] landingSounds;
+
+[Range(0f, 1f)] public float landingVolume = 0.5f;
+
+int lastLandingIndex = -1;
+
+[Header("Audio Volume")]
+[Range(0f, 1f)] public float footstepVolume = 0.3f;
+[Range(0f, 1f)] public float jumpVolume = 0.5f;
+
+    [Header("Audio")]
+public AudioClip[] jumpSounds;
+    [Header("Footsteps")]
+public AudioClip[] volkarisSteps;
+public AudioClip[] grassSteps;
+
+    [Header("Footsteps")]
+public AudioClip[] footstepSounds;
+public float footstepInterval = 0.4f;
+
+float footstepTimer = 0f;
 
 [Header("Upgrade Limits")]
 
@@ -443,7 +524,7 @@ else
 void OnEnable()
 
 {
-
+    hasPlayedDeathSound = false;
     input = new PlayerInputActions();
 
     input.Gameplay.Enable();
@@ -820,6 +901,8 @@ UpdateFacing();
 
     HandlePoison();
 
+    HandleFootsteps();
+
 }
 
 
@@ -851,6 +934,7 @@ void StartDash()
 {
 
     // 🔥 CANCEL KNOCKBACK (VERY IMPORTANT)
+    PlayDashSound();
 
 knockbackTimer = 0f;
 
@@ -1160,6 +1244,8 @@ void StartJump()
 
     if (isJumping) return;
 
+    PlayJumpSound();
+
     Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);
 
     isJumping = true;
@@ -1233,6 +1319,8 @@ void UpdateJump()
     {
 
         isJumping = false;
+
+        PlayLandingSound();
 
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
 
@@ -1477,21 +1565,13 @@ public void SpawnAttack1VFX()
 {
 
 if (attack1VfxPrefab == null) return;
-
-
-
+PlaySlashSound();
 Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(
 
     new Vector3(mouseScreenPos.x, mouseScreenPos.y, 10f)
 
 );
-
-
-
 Vector2 dir = (Vector2)(mouseWorld - transform.position);
-
-
-
 if (dir.sqrMagnitude < 0.001f)
 
     dir = Vector2.right;
@@ -1707,6 +1787,7 @@ SpawnAttack2Projectile(attack2RightOffset);
 void SpawnAttack2Projectile(Vector2 localOffset)
 
 {
+    PlayFireballSound();
 
 if (attack2VfxPrefab == null) return;
 
@@ -1951,7 +2032,7 @@ hitEnemies.Add(enemy);
 public void TakeDamage(float damage, Vector2 hitDirection)
 
 {
-
+    PlayHurtSound();
 if (isDead) return;  
 
 if (invulnTimer > 0f) return;  
@@ -2035,6 +2116,7 @@ TakeDamage(damage, hitDir);
 void Die()
 
 {
+    PlayDeathSound();
 
 if (isDead) return;
 
@@ -2690,4 +2772,249 @@ if (sprite != null)
 
 }
 
+void HandleFootsteps()
+{
+    if (IsDashing || isJumping) return;
+
+    bool isMoving = moveInput.sqrMagnitude > 0.01f;
+
+    if (!isMoving)
+    {
+        footstepTimer = 0f;
+        return;
+    }
+
+    footstepTimer += Time.deltaTime;
+
+    if (footstepTimer >= footstepInterval)
+    {
+        footstepTimer = 0f;
+        PlayFootstep();
+    }
+}
+
+void PlayFootstep()
+{
+    if (AudioManager.Instance == null) return;
+
+    AudioClip[] currentSet = GetCurrentFootsteps();
+    if (currentSet == null || currentSet.Length == 0) return;
+
+    int index = Random.Range(0, currentSet.Length);
+
+    AudioManager.Instance.PlaySFX(currentSet[index], footstepVolume);
+}
+public void ResetFootsteps()
+{
+    footstepTimer = 0f;
+}
+
+AudioClip[] GetCurrentFootsteps()
+{
+    Vector3 worldPos = transform.position;
+
+    Vector3Int cellPos = groundTilemap.WorldToCell(worldPos);
+
+    TileBase tile = groundTilemap.GetTile(cellPos);
+
+    if (tile != null)
+    {
+        string tileName = tile.name;
+
+        // 🔥 CHECK NAME
+        if (tileName.Contains("Volkaris"))
+            return volkarisSteps;
+    }
+
+    return grassSteps;
+}
+
+int lastJumpIndex = -1;
+
+void PlayJumpSound()
+{
+    if (jumpSounds == null || jumpSounds.Length == 0) return;
+
+    int index;
+    do
+    {
+        index = Random.Range(0, jumpSounds.Length);
+    }
+    while (index == lastJumpIndex && jumpSounds.Length > 1);
+
+    lastJumpIndex = index;
+
+    float pitch = Random.Range(0.95f, 1.05f);
+    AudioManager.Instance.sfxSource.pitch = pitch;
+
+    // 🔊 USE CUSTOM VOLUME
+    AudioManager.Instance.PlaySFX(jumpSounds[index], jumpVolume);
+
+    AudioManager.Instance.sfxSource.pitch = 1f;
+}
+
+void PlayLandingSound()
+{
+    if (landingSounds == null || landingSounds.Length == 0) return;
+
+    int index;
+
+    // ❌ PREVENT SAME SOUND TWICE
+    do
+    {
+        index = Random.Range(0, landingSounds.Length);
+    }
+    while (index == lastLandingIndex && landingSounds.Length > 1);
+
+    lastLandingIndex = index;
+
+    // 🎚 RANDOM PITCH (slightly wider for impact)
+    float pitch = Random.Range(0.9f, 1.1f);
+
+    // 🔊 RANDOM VOLUME (VERY IMPORTANT)
+    float volume = Random.Range(landingVolume * 0.85f, landingVolume * 1.1f);
+
+    AudioManager.Instance.sfxSource.pitch = pitch;
+
+    AudioManager.Instance.PlaySFX(landingSounds[index], volume);
+
+    AudioManager.Instance.sfxSource.pitch = 1f;
+}
+
+void PlayDashSound()
+{
+    if (dashSounds == null || dashSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index = Random.Range(0, dashSounds.Length);
+
+    AudioManager.Instance.PlaySFX(dashSounds[index], dashVolume);
+}
+IEnumerator StopDashAudio()
+{
+    yield return new WaitForSeconds(dashAudioDuration);
+
+    // 🔥 SAFE STOP (only if still same sound)
+    if (AudioManager.Instance != null)
+        AudioManager.Instance.sfxSource.Stop();
+}
+
+void PlaySlashSound()
+{
+    if (slashSounds == null || slashSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+    if (AudioManager.Instance.sfxSource == null) return;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, slashSounds.Length);
+    }
+    while (index == lastSlashIndex && slashSounds.Length > 1);
+
+    lastSlashIndex = index;
+
+    float pitch = Random.Range(0.95f, 1.05f);
+
+    AudioManager.Instance.sfxSource.pitch = pitch;
+    AudioManager.Instance.PlaySFX(slashSounds[index], slashVolume);
+    AudioManager.Instance.sfxSource.pitch = 1f;
+}
+void PlayHurtSound()
+{
+    if (hurtSounds == null || hurtSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+    if (AudioManager.Instance.sfxSource == null) return;
+
+    // 🛑 prevent spam
+    if (Time.time - lastHurtTime < hurtCooldown)
+        return;
+
+    lastHurtTime = Time.time;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, hurtSounds.Length);
+    }
+    while (index == lastHurtIndex && hurtSounds.Length > 1);
+
+    lastHurtIndex = index;
+
+    float pitch = Random.Range(hurtMinPitch, hurtMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(hurtSounds[index], hurtVolume);
+
+    source.pitch = originalPitch;
+}
+
+void PlayDeathSound()
+{
+    if (hasPlayedDeathSound) return; // 🛑 only once
+    if (deathSounds == null || deathSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+    if (AudioManager.Instance.sfxSource == null) return;
+
+    hasPlayedDeathSound = true;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, deathSounds.Length);
+    }
+    while (index == lastDeathIndex && deathSounds.Length > 1);
+
+    lastDeathIndex = index;
+
+    float pitch = Random.Range(deathMinPitch, deathMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(deathSounds[index], deathVolume);
+
+    source.pitch = originalPitch;
+}
+
+public void ResetPlayer()
+{
+    hasPlayedDeathSound = false;
+}
+
+void PlayFireballSound()
+{
+    if (fireballSounds == null || fireballSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, fireballSounds.Length);
+    }
+    while (index == lastFireballIndex && fireballSounds.Length > 1);
+
+    lastFireballIndex = index;
+
+    float pitch = Random.Range(fireballMinPitch, fireballMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(fireballSounds[index], fireballVolume);
+
+    source.pitch = originalPitch;
+}
 }

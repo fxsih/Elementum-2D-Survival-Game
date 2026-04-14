@@ -10,6 +10,17 @@ public class WitchShooter : MonoBehaviour
     public float shootCooldown = 2f;
     public Transform firePoint;
 
+    [Header("Witch Projectile Audio")]
+public AudioClip[] projectileSounds;
+
+[Range(0f,1f)]
+public float projectileVolume = 0.7f;
+
+public float projectileMinPitch = 1.0f;
+public float projectileMaxPitch = 1.2f;
+
+int lastProjectileIndex = -1;
+
     bool isAttacking = false;
     bool hasFiredThisAttack = false;
 
@@ -128,6 +139,7 @@ public class WitchShooter : MonoBehaviour
     public void SpawnProjectile()
     {
         if (hasFiredThisAttack) return;
+        PlayProjectileSound();
 
         FireProjectile();
         hasFiredThisAttack = true;
@@ -223,4 +235,31 @@ public class WitchShooter : MonoBehaviour
 
         return basePos;
     }
+
+    void PlayProjectileSound()
+{
+    if (projectileSounds == null || projectileSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, projectileSounds.Length);
+    }
+    while (index == lastProjectileIndex && projectileSounds.Length > 1);
+
+    lastProjectileIndex = index;
+
+    float pitch = Random.Range(projectileMinPitch, projectileMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(projectileSounds[index], projectileVolume);
+
+    source.pitch = originalPitch;
+}
 }

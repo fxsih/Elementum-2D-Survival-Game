@@ -6,6 +6,7 @@ TagManager:
   tags:
   - DepthBase
   - Enemy
+  - VOLKARIS
   layers:
   - Default
   - TransparentFX
@@ -22,7 +23,7 @@ TagManager:
   - Ocean and LAVA
   - Enemy
   - Enemy Projectile
-  - 
+  - Volkaris
   - 
   - 
   - 

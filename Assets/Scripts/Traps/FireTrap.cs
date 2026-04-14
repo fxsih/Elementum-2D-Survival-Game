@@ -16,6 +16,10 @@ public class FireTrap : MonoBehaviour
 
     Animator anim;
     Collider2D col;
+    [SerializeField] AudioClip[] fireStartSounds;
+[SerializeField] float volume = 1f;
+
+int lastFireIndex = -1;
 
     void Awake()
     {
@@ -38,6 +42,8 @@ public class FireTrap : MonoBehaviour
     // 🔥 CALLED FROM ANIMATION EVENT
     public void OnTrapHit()
     {
+        PlayFireSound();
+        
         Collider2D[] hits = Physics2D.OverlapCircleAll(hitPoint.position, hitRadius);
 
         foreach (Collider2D hit in hits)
@@ -91,4 +97,28 @@ public class FireTrap : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(hitPoint.position, hitRadius);
     }
+
+    void PlayFireSound()
+{
+    if (fireStartSounds == null || fireStartSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+    do
+    {
+        index = Random.Range(0, fireStartSounds.Length);
+    }
+    while (index == lastFireIndex && fireStartSounds.Length > 1);
+
+    lastFireIndex = index;
+
+    float pitch = Random.Range(0.95f, 1.1f);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+    float originalPitch = source.pitch;
+
+    source.pitch = pitch;
+    source.PlayOneShot(fireStartSounds[index], volume);
+    source.pitch = originalPitch;
+}
 }

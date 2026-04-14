@@ -36,6 +36,11 @@ public class TreasureChest : MonoBehaviour
 
     bool isOpening = false;
 
+    [SerializeField] AudioClip[] hitSounds;
+[SerializeField] float volume = 1f;
+
+int lastHitIndex = -1;
+
     void Start()
     {
         currentHealth = maxHealth;
@@ -77,7 +82,8 @@ public class TreasureChest : MonoBehaviour
     // ================= HIT =================
 
     public void HitChest()
-    {
+    {   
+        PlayHitSound();
         Debug.Log("💥 Chest Hit");
 
         if (isOpening) return;
@@ -166,26 +172,31 @@ public class TreasureChest : MonoBehaviour
     // ================= UI (FADE TEXT) =================
 
     void ShowTimerUI()
+{
+    Debug.Log("📢 ShowTimerUI called");
+
+    if (timerUI == null || timerValueText == null)
     {
-        Debug.Log("📢 ShowTimerUI called");
-
-        if (timerUI == null || timerValueText == null)
-        {
-            Debug.LogError("❌ UI NOT ASSIGNED");
-            return;
-        }
-
-        int m = Mathf.FloorToInt(timer / 60f);
-        int s = Mathf.FloorToInt(timer % 60f);
-
-        timerValueText.text = $"{m:00}:{s:00}";
-
-        if (fadeRoutine != null)
-            StopCoroutine(fadeRoutine);
-
-        fadeRoutine = StartCoroutine(FadeTimerText());
+        Debug.LogError("❌ UI NOT ASSIGNED");
+        return;
     }
 
+    int m = Mathf.FloorToInt(timer / 60f);
+    int s = Mathf.FloorToInt(timer % 60f);
+
+    string timeText = $"{m:00}:{s:00}";
+
+    // 🔥 FIX: add correct unit
+    if (m > 0)
+        timerValueText.text = timeText + " MINUTES";
+    else
+        timerValueText.text = timeText + " SECONDS";
+
+    if (fadeRoutine != null)
+        StopCoroutine(fadeRoutine);
+
+    fadeRoutine = StartCoroutine(FadeTimerText());
+}
     IEnumerator FadeTimerText()
     {
         timerUI.SetActive(true);
@@ -241,4 +252,28 @@ public class TreasureChest : MonoBehaviour
         if (sr != null)
             sr.color = originalColor;
     }
+
+    void PlayHitSound()
+{
+    if (hitSounds == null || hitSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+    do
+    {
+        index = Random.Range(0, hitSounds.Length);
+    }
+    while (index == lastHitIndex && hitSounds.Length > 1);
+
+    lastHitIndex = index;
+
+    float pitch = Random.Range(0.95f, 1.1f);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+    float originalPitch = source.pitch;
+
+    source.pitch = pitch;
+    source.PlayOneShot(hitSounds[index], volume);
+    source.pitch = originalPitch;
+}
 }

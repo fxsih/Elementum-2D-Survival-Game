@@ -15,6 +15,10 @@ public class SpikeTrap : MonoBehaviour
 
     Animator anim;
     Collider2D col;
+    [SerializeField] AudioClip[] spikeSounds;
+[SerializeField] float volume = 1f;
+
+int lastIndex = -1;
 
     void Awake()
     {
@@ -37,6 +41,8 @@ public class SpikeTrap : MonoBehaviour
     // 🔥 CALLED FROM ANIMATION EVENT
     public void OnTrapHit()
     {
+        PlaySpikeSound();
+
         Collider2D[] hits = Physics2D.OverlapCircleAll(hitPoint.position, hitRadius);
 
         foreach (Collider2D hit in hits)
@@ -68,4 +74,28 @@ public class SpikeTrap : MonoBehaviour
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(hitPoint.position, hitRadius);
     }
+
+void PlaySpikeSound()
+{
+    if (spikeSounds == null || spikeSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+    do
+    {
+        index = Random.Range(0, spikeSounds.Length);
+    }
+    while (index == lastIndex && spikeSounds.Length > 1);
+
+    lastIndex = index;
+
+    float pitch = Random.Range(0.95f, 1.1f);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+    float originalPitch = source.pitch;
+
+    source.pitch = pitch;
+    source.PlayOneShot(spikeSounds[index], volume);
+    source.pitch = originalPitch;
+}
 }

@@ -16,6 +16,17 @@ public class GameOverManager : MonoBehaviour
 public TMP_Text highScoreValueText;
 bool waitingForInput = false;
 
+[Header("Death Panel Audio")]
+public AudioClip[] deathPanelSounds;
+
+[Range(0f,1f)]
+public float deathPanelVolume = 1f;
+
+public float deathPanelMinPitch = 0.95f;
+public float deathPanelMaxPitch = 1.05f;
+
+int lastDeathPanelIndex = -1;
+
     void Awake()
     {
         Instance = this;
@@ -81,6 +92,7 @@ void ShowHighScoreScreen(int score)
 {
     yield return new WaitForSecondsRealtime(0.2f);
     deathPanel.SetActive(true);
+    PlayDeathPanelSound();
 }
    public void Respawn()
 {
@@ -133,4 +145,31 @@ IEnumerator RespawnRoutine()
             SceneManager.LoadScene("MainMenu");
         }
     }
+
+    void PlayDeathPanelSound()
+{
+    if (deathPanelSounds == null || deathPanelSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, deathPanelSounds.Length);
+    }
+    while (index == lastDeathPanelIndex && deathPanelSounds.Length > 1);
+
+    lastDeathPanelIndex = index;
+
+    float pitch = Random.Range(deathPanelMinPitch, deathPanelMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(deathPanelSounds[index], deathPanelVolume);
+
+    source.pitch = originalPitch;
+}
 }

@@ -136,6 +136,12 @@ MonoBehaviour:
   magnetRange: 2.5
   magnetSpeed: 35
   magnetDelay: 0.25
+  collectSounds:
+  - {fileID: 8300000, guid: 7a7ec2b3a275c9a49ac69f4b2b802077, type: 3}
+  - {fileID: 8300000, guid: 55448f070df02e445845b6390b89ff8d, type: 3}
+  - {fileID: 8300000, guid: 038e797dd923e3248a851f962690316c, type: 3}
+  - {fileID: 8300000, guid: 6037e904f03cedd409b9c0ac83518ab5, type: 3}
+  volume: 0.7
 --- !u!70 &5603601928257937387
 CapsuleCollider2D:
   m_ObjectHideFlags: 0

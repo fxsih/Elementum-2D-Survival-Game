@@ -21,21 +21,21 @@ void Awake()
         ApplySettings();
     }
 
-    public void ApplySettings()
-    {
-        AudioListener.volume = GetMasterVolume();
-        Screen.fullScreen = GetFullscreen();
-    }
+   public void ApplySettings()
+{
+    AudioListener.volume = GetMasterVolume();
+    Screen.fullScreen = GetFullscreen();
+
+    AudioManager.Instance?.ApplyVolumes(); // 🔥 ADD THIS
+}
 
     // 🎚 MASTER
 public void SetMasterVolume(float value)
 {
-    Debug.Log("Saving Master: " + value);
-
     PlayerPrefs.SetFloat("MASTER_VOL", value);
     PlayerPrefs.Save();
 
-    AudioListener.volume = value; // 🔥 ADD THIS
+    ApplySettings(); // 🔥 ADD THIS
 }
 
     public float GetMasterVolume()
@@ -44,10 +44,12 @@ public void SetMasterVolume(float value)
     }
 
     // 🎵 MUSIC
-   public void SetMusicVolume(float value)
+ public void SetMusicVolume(float value)
 {
     PlayerPrefs.SetFloat("MUSIC_VOL", value);
     PlayerPrefs.Save();
+
+    ApplySettings(); // 🔥 ADD THIS
 }
 
     public float GetMusicVolume()
@@ -56,10 +58,12 @@ public void SetMasterVolume(float value)
     }
 
     // 🔊 SFX
-   public void SetSFXVolume(float value)
+public void SetSFXVolume(float value)
 {
     PlayerPrefs.SetFloat("SFX_VOL", value);
     PlayerPrefs.Save();
+
+    ApplySettings(); // 🔥 ADD THIS
 }
 
     public float GetSFXVolume()

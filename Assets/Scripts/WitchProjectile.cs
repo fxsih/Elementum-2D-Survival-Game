@@ -12,6 +12,16 @@ public float explosionRadius = 1.5f;
     Vector2 direction;
 
     Rigidbody2D rb;
+    [Header("Explosion Audio")]
+public AudioClip[] explosionSounds;
+
+[Range(0f,1f)]
+public float explosionVolume = 0.9f;
+
+public float explosionMinPitch = 0.9f;
+public float explosionMaxPitch = 1.1f;
+
+int lastExplosionIndex = -1;
 
     void Awake()
     {
@@ -55,11 +65,39 @@ Physics2D.IgnoreLayerCollision(projectileLayer, enemyLayer, true);
     Explode();
 }
 
-void Explode()
+public void Explode()
 {
+    PlayExplosionSound();
     if (explosionPrefab != null)
         Instantiate(explosionPrefab, transform.position, Quaternion.identity);
 
     Destroy(gameObject);
+}
+
+void PlayExplosionSound()
+{
+    if (explosionSounds == null || explosionSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, explosionSounds.Length);
+    }
+    while (index == lastExplosionIndex && explosionSounds.Length > 1);
+
+    lastExplosionIndex = index;
+
+    float pitch = Random.Range(explosionMinPitch, explosionMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(explosionSounds[index], explosionVolume);
+
+    source.pitch = originalPitch;
 }
 }

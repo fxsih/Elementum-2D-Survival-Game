@@ -18,6 +18,17 @@ public class Attack2Projectile : MonoBehaviour
 
     float damage; // ✅ ONLY damage variable (clean)
 
+    [Header("Explosion Audio")]
+public AudioClip[] explosionSounds;
+
+[Range(0f,1f)]
+public float explosionVolume = 1f;
+
+public float explosionMinPitch = 0.9f;
+public float explosionMaxPitch = 1.1f;
+
+int lastExplosionIndex = -1;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -65,6 +76,7 @@ public class Attack2Projectile : MonoBehaviour
     void Hit()
     {
         hasHit = true;
+        PlayExplosionSound();
 
         if (rb != null)
             rb.linearVelocity = Vector2.zero;
@@ -119,4 +131,32 @@ public class Attack2Projectile : MonoBehaviour
             hitRb.AddForce(dir * explosionForce * falloff, ForceMode2D.Impulse);
         }
     }
+
+    void PlayExplosionSound()
+{
+    if (explosionSounds == null || explosionSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+    if (AudioManager.Instance.sfxSource == null) return;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, explosionSounds.Length);
+    }
+    while (index == lastExplosionIndex && explosionSounds.Length > 1);
+
+    lastExplosionIndex = index;
+
+    float pitch = Random.Range(explosionMinPitch, explosionMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(explosionSounds[index], explosionVolume);
+
+    source.pitch = originalPitch;
+}
 }

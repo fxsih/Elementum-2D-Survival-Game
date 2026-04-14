@@ -12,6 +12,18 @@ public class WitchCombat : MonoBehaviour
 
     public float knockbackForce = 4f;
 
+    [Header("Witch Death Audio")]
+public AudioClip[] deathSounds;
+
+[Range(0f,1f)]
+public float deathVolume = 0.9f;
+
+public float deathMinPitch = 0.9f;
+public float deathMaxPitch = 1.1f;
+
+int lastDeathIndex = -1;
+bool hasPlayedDeath = false;
+
 void Start()
 {
     anim = GetComponent<Animator>();
@@ -69,6 +81,7 @@ void Update()
 {
     // ONLY extra effects — NO animation control
 
+    PlayDeathSound();
     GetComponent<WitchShooter>().enabled = false;
 
     var ai = GetComponent<Pathfinding.AIPath>();
@@ -109,5 +122,35 @@ IEnumerator FadeOutAndDestroy()
     }
 
     Destroy(gameObject);
+}
+
+void PlayDeathSound()
+{
+    if (hasPlayedDeath) return;
+    if (deathSounds == null || deathSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    hasPlayedDeath = true;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, deathSounds.Length);
+    }
+    while (index == lastDeathIndex && deathSounds.Length > 1);
+
+    lastDeathIndex = index;
+
+    float pitch = Random.Range(deathMinPitch, deathMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(deathSounds[index], deathVolume);
+
+    source.pitch = originalPitch;
 }
 }

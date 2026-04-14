@@ -9,12 +9,17 @@ public class MainMenu : MonoBehaviour
     public GameObject settingsPanel;
     public GameObject infoPanel; // ✅ ADD THIS
 
+    [Header("Audio")]
+    public AudioClip menuMusic; // 🎵 ADD THIS
+
     public Texture2D cursorTexture;
     public Vector2 hotspot;
 
     void Start()
     {
         ApplyCursor();
+        // 🎵 PLAY MENU MUSIC
+    AudioManager.Instance.PlayMusic(menuMusic);
     }
 
     void ApplyCursor()

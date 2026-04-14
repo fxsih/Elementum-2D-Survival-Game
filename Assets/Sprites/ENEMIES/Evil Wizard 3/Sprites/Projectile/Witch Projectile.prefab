@@ -198,3 +198,10 @@ MonoBehaviour:
   explosionPrefab: {fileID: 4691783601579606393, guid: 389306c9e393ccf4c9640443b1ffa0e8,
     type: 3}
   explosionRadius: 1.5
+  explosionSounds:
+  - {fileID: 8300000, guid: e08e9732e12bd6f4ebc1efc45a9680b3, type: 3}
+  - {fileID: 8300000, guid: ac47dc9f72d7ed7489af33da203398c2, type: 3}
+  - {fileID: 8300000, guid: aeb3be96b634bc949a573097c29f8ef3, type: 3}
+  explosionVolume: 0.11
+  explosionMinPitch: 0.9
+  explosionMaxPitch: 1.1

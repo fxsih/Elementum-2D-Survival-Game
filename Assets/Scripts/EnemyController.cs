@@ -4,6 +4,18 @@ using Pathfinding;
 [RequireComponent(typeof(Rigidbody2D))]
 public class EnemyController : MonoBehaviour
 {
+
+   [Header("Hit Audio")]
+public AudioClip[] hitSounds;
+
+[Range(0f,1f)]
+public float hitVolume = 0.8f;
+
+[Header("Pitch Variation")]
+public float minPitch = 0.9f;
+public float maxPitch = 2f;
+
+int lastHitIndex = -1;
     public float moveSpeed = 2f;
     public float maxHealth = 10f;
     bool isDead = false;
@@ -83,6 +95,7 @@ public void TakeDamage(float damage, bool applyHitstop = true)
 {
     if (isDead) return;
     if (isInvulnerable) return;
+    PlayHitSound();
 
     // 🔥 BLOCK SAME FRAME MULTI HIT
     if (lastHitFrame == Time.frameCount)
@@ -268,5 +281,36 @@ public void ForceKill()
     DropGems();
 
     Destroy(gameObject);
+}
+
+void PlayHitSound()
+{
+    if (hitSounds == null || hitSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+    if (AudioManager.Instance.sfxSource == null) return;
+
+    int index;
+
+    // 🔁 avoid same sound twice
+    do
+    {
+        index = Random.Range(0, hitSounds.Length);
+    }
+    while (index == lastHitIndex && hitSounds.Length > 1);
+
+    lastHitIndex = index;
+
+    // 🎚 random pitch
+    float pitch = Random.Range(minPitch, maxPitch);
+
+    // 💡 TEMP pitch change (safe enough for short SFX)
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(hitSounds[index], hitVolume);
+
+    source.pitch = originalPitch;
 }
 }

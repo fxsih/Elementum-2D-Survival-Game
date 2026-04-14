@@ -8,6 +8,11 @@ public class GameManager : MonoBehaviour
     int KillCount = 0;
     public float levelStartTime = 0f;
 
+   [Header("Audio")]
+public AudioClip gameMusic;
+
+[Range(0f,1f)] public float gameMusicBaseVolume = 0.8f;
+
     public Texture2D cursorTexture;
 
     [Header("Level System")]
@@ -32,6 +37,10 @@ void Start()
     ScoreManager.Instance.ResetScore();
     Cursor.SetCursor(cursorTexture, new Vector2(23, 23), CursorMode.ForceSoftware);
     Cursor.lockState = CursorLockMode.Confined;
+    if (AudioManager.Instance != null)
+    {
+        AudioManager.Instance.PlayMusicWithFade(gameMusic, 0.5f, 1f, 0.5f, gameMusicBaseVolume);
+    }
 }
     void Update()
 {

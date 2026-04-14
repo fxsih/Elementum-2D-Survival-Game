@@ -21,6 +21,19 @@ public class RedSlimeExploder : MonoBehaviour
     SpriteRenderer sr;
     Animator anim;
 
+    [Header("Death Audio")]
+public AudioClip[] deathSounds;
+
+[Range(0f,1f)]
+public float deathVolume = 1f;
+
+[Header("Pitch Variation")]
+public float deathMinPitch = 0.85f;
+public float deathMaxPitch = 1.05f;
+
+int lastDeathIndex = -1;
+bool hasPlayedDeath = false;
+
    void Start()
 {
     enemy = GetComponent<EnemyController>();
@@ -73,7 +86,8 @@ public class RedSlimeExploder : MonoBehaviour
     Explode();
 }
     void Explode()
-    {
+    {   
+        PlayDeathSound();
         if (enemy == null) return;
         if (hasExploded) return;
         hasExploded = true;
@@ -124,5 +138,35 @@ void OnDestroy()
 {
     if (enemy != null)
         enemy.OnDeath -= HandleDeathExplosion;
+}
+
+void PlayDeathSound()
+{
+    if (hasPlayedDeath) return;
+    if (deathSounds == null || deathSounds.Length == 0) return;
+    if (AudioManager.Instance == null) return;
+
+    hasPlayedDeath = true;
+
+    int index;
+
+    do
+    {
+        index = Random.Range(0, deathSounds.Length);
+    }
+    while (index == lastDeathIndex && deathSounds.Length > 1);
+
+    lastDeathIndex = index;
+
+    float pitch = Random.Range(deathMinPitch, deathMaxPitch);
+
+    AudioSource source = AudioManager.Instance.sfxSource;
+
+    float originalPitch = source.pitch;
+    source.pitch = pitch;
+
+    source.PlayOneShot(deathSounds[index], deathVolume);
+
+    source.pitch = originalPitch;
 }
 }
