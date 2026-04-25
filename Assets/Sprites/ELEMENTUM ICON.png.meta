@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 43d25700075c85f469a658cc604ceef4
+guid: cf0a74483c4befb4fb9d3f6d0d7e2c92
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 4527031771248293843
-    second: yItRU - Edited_0
+      213: 5790348151681623269
+    second: ELEMENTUM ICON_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,7 +46,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 2
+  spriteMode: 1
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: yItRU - Edited_0
+      name: ELEMENTUM ICON_0
       rect:
         serializedVersion: 2
-        x: 79
-        y: 76
-        width: 672
-        height: 663
+        x: 80
+        y: 77
+        width: 670
+        height: 662
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3d77924296f33de30800000000000000
-      internalID: 4527031771248293843
+      spriteID: 5e4a2d227f27b5050800000000000000
+      internalID: 5790348151681623269
       vertices: []
       indices: 
       edges: []
@@ -151,7 +151,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 5e97eb03825dee720800000000000000
     internalID: 0
     vertices: []
     indices: 
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      yItRU - Edited_0: 4527031771248293843
+      ELEMENTUM ICON_0: 5790348151681623269
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
